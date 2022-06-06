@@ -37,7 +37,8 @@ public:
   const bool copy;
 
 
-  Task(sgd_params* params,
+  Task(uint nodes,
+       sgd_params* params,
        Model model,
        abstract_data_scheme* data_scheme,
        const dataset& train,
@@ -51,7 +52,7 @@ public:
         threads(threads),
         validator(new uint(0)),
         stop(new std::atomic<bool>(false)),
-        perm(new permutation(threads)),
+        perm(new permutation(nodes, train.get_data(0).get_size())),
         copy(false) {}
 
   Task(const Task& other)
@@ -79,6 +80,7 @@ void* thread_task(void* args, const uint thread_id) {
     Task task = *reinterpret_cast<Task*>(args);
 
     const uint node = config.get_node_for_thread(thread_id);
+    const uint phy_threads = std::min(task.threads, config.get_phy_cpus());
     const dataset_local& data = task.train.get_data(node);
     const uint block_size = data.get_size() / task.threads;
     abstract_data_scheme* const scheme = task.data_scheme;
@@ -86,23 +88,19 @@ void* thread_task(void* args, const uint thread_id) {
     void* const model_args = scheme->get_model_args(thread_id);
     const ModelUpdate& update = task.model.update;
 
-    const uint n = task.params.max_epochs;
-    uint epochs = n;
-//    std::vector<int> p(data.size);
-//    FOR_N(i, data.size) {
-//        p[i] = i;
-//    }
-    FOR_N(e, n) {
-//        std::random_shuffle(p.begin(), p.end());
-        const fp_type step = task.params.step;
+    perm_node* perm_n = task.perm->get_basic_permutation(node);
 
-        const uint block = task.perm->get_permutation(thread_id);
-        const uint start = block_size * block;
-        const uint end = std::min(data.get_size(), block_size * (block + 1));
+    const uint n = task.params.max_epochs;
+    const uint start = block_size * thread_id;
+    const uint end = std::min(data.get_size(), block_size * (thread_id + 1));
+    uint epochs = n;
+    FOR_N(e, n) {
+        const fp_type step = task.params.step;
+        const uint* perm_array = perm_n->permutation;
 
         // Update cycle must avoid any unnecessary NUMA communication
         for (uint i = start; i < end; ++i) {
-            const data_point& point = data[i];
+            const data_point& point = data[perm_array[i]];
             update(point, w, step, model_args);
             scheme->post_update(thread_id);
         }
@@ -120,11 +118,11 @@ void* thread_task(void* args, const uint thread_id) {
                 epochs = e + 1;
                 break;
             }
-            task.perm->permute();
             uint next_id = thread_id + 1;
-            if (next_id == task.threads) next_id = 0;
+            if (next_id == phy_threads) next_id = 0;
             *task.validator = next_id;
         }
+        perm_n = perm_n->gen_next();
     }
     return new uint(epochs);
 }
@@ -138,7 +136,7 @@ bool run_experiment(
     abstract_data_scheme* data_scheme,
     std::vector<void*>& results
 ) {
-    Task task(params, model, data_scheme, train, validate, tp.get_size());
+    Task task(tp.get_numa_count(), params, model, data_scheme, train, validate, tp.get_size());
 
     results = tp.execute(thread_task, &task);
 
@@ -156,8 +154,8 @@ struct experiment_configuration {
   std::string algorithm;
   unsigned test_repeats = 1;
   unsigned threads = 1, cluster_size = 1, max_epochs = 100, update_delay = 64;
-  unsigned block_size = 1024;
-  fp_type target_accuracy = 1, step_size = 0.5, step_decay = 0.8, mu = 1, tolerance = 0.01;
+  fp_type target_accuracy = 1, step_size = 0.5, step_decay = 0.8;
+  fp_type mu = 1, tolerance = 0.01;
 
   experiment_configuration(const dataset& train_dataset,
                            const dataset& test_dataset,
@@ -166,13 +164,22 @@ struct experiment_configuration {
   bool from_string(const std::string& command) {
       std::stringstream ss(command);
 
-      // HogWild 10 2 1 100 1 0.97713 0.5 0.8 1.0 0.01
+      // HogWild 10 2 1 100 128 0.97713 0.5 0.8
       ss >> algorithm >> test_repeats >> threads >> cluster_size >> max_epochs >> update_delay >> target_accuracy
-         >> step_size >> step_decay >> mu >> tolerance;
+         >> step_size >> step_decay;
       return !ss.fail();
   }
 
-  void run_experiments() {
+  void run_experiments(std::ostream& out) {
+      std::cout << "Start experiments (" << test_repeats << ") with " << algorithm << " algorithm"
+                << " threads=" << threads
+                << (algorithm == "HogWild" ? "" : " cluster_size=" + std::to_string(cluster_size))
+                << " target_accuracy=" << target_accuracy
+                << " step_size=" << step_size
+                << " step_decay=" << step_decay
+                << (algorithm == "HogWild" ? "" : " update_delay=" + std::to_string(update_delay))
+                << std::endl;
+
       thread_pool tp(threads);
 
       const uint features = train_dataset.get_features();
@@ -187,7 +194,6 @@ struct experiment_configuration {
       params.target_accuracy = target_accuracy;
       params.step_decay = step_decay;
       params.step = step_size;
-      params.block_size = block_size;
 
       FOR_N(run, test_repeats) {
           std::unique_ptr <abstract_data_scheme> scheme;
@@ -211,7 +217,7 @@ struct experiment_configuration {
               epochs += *e;
               delete e;
           }
-          fp_type average_epochs = epochs / threads;
+          fp_type average_epochs = static_cast<fp_type>(epochs) / threads;
 
           fp_type train_accuracy = compute_accuracy(model.predict, train_dataset, scheme->get_model_vector(0));
           fp_type validate_accuracy = compute_accuracy(model.predict, validate_dataset, scheme->get_model_vector(0));
@@ -221,12 +227,20 @@ struct experiment_configuration {
           std::cout << std::fixed << std::setprecision(5) << std::setfill(' ')
                     << "Experiment " << run + 1 << "/" << test_repeats
                     << " completed with " << (success ? "SUCCESS" : "FAIL")
-                    << " with train accuracy " << train_accuracy
-                    << " with validate accuracy " << validate_accuracy
-                    << " with test accuracy " << test_accuracy
-                    << " in " << time.count() << " seconds"
-                    << " took " << average_epochs << " average epochs"
+                    << " train=" << train_accuracy
+                    << " validate=" << validate_accuracy
+                    << " test=" << test_accuracy
+                    << " time=" << time.count()
+                    << " epochs=" << average_epochs
+                    << " per_epoch=" << time.count() / average_epochs
                     << std::endl;
+
+          out << algorithm << ',' << threads << ',' << cluster_size << ',' << (success ? 1 : 0) << ','
+              << time.count() << ',' << train_accuracy << ',' << validate_accuracy << ',' << test_accuracy << ','
+              << epochs << ',' << time.count() / average_epochs << ','
+              << step_size << ',' << step_decay << ',' << update_delay << ','
+              << target_accuracy
+              << std::endl;
 
           if (!success) {
               std::cerr << "Break experiments!" << std::endl;

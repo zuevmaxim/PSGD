@@ -8,86 +8,77 @@
 #include "types.h"
 #include <vector>
 #include <atomic>
+#include <random>
+#include <chrono>
 
-class rw_lock {
-private:
-  std::atomic<int> counter;
-
-public:
-  void read_lock() {
-      while (counter.fetch_add(1) < 0) {
-          counter.fetch_sub(1);
-      }
-  }
-
-  void read_unlock() {
-      counter.fetch_sub(1);
-  }
-
-  void write_lock() {
-      int expected = 0;
-      while (!counter.compare_exchange_strong(expected, INT_MIN));
-  }
-
-  void write_unlock() {
-      counter.store(0);
-  }
-};
-
-class read_lock_holder {
-private:
-  rw_lock& lock;
-public:
-  read_lock_holder(rw_lock& lock) : lock(lock) {
-      lock.read_lock();
-  }
-
-  ~read_lock_holder() {
-      lock.read_unlock();
-  }
-};
-
+class permutation;
 
 class perm_node {
-public:
-  std::vector <uint> permutation;
+  friend class permutation;
 
-  perm_node(uint size) {
-      permutation.resize(size);
+  std::atomic<perm_node*> next;
+  const uint size;
+public:
+  uint* permutation;
+
+  perm_node(uint size) : next(NULL), size(size) {
+      permutation = new uint[size];
       FOR_N(i, size) {
           permutation[i] = i;
       }
-      std::random_shuffle(permutation.begin(), permutation.end());
+      const uint seed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+      std::mt19937 gen;
+      gen.seed(seed);
+      std::shuffle(permutation, permutation + size, gen);
+  }
+
+  ~perm_node() {
+      perm_node* next_node = next.load();
+      if (next_node != NULL) delete next_node;
+      delete permutation;
+  }
+
+  perm_node* gen_next() {
+      perm_node* next_node = next.load();
+      if (next_node != NULL) return next_node;
+
+      perm_node* const new_node = new perm_node(size);
+      perm_node* cur_node = this;
+      while (true) {
+          perm_node* cur_next = NULL;
+          if (cur_node->next.compare_exchange_strong(cur_next, new_node)) break;
+          cur_node = cur_next;
+      }
+      return next.load();
   }
 };
 
 class permutation {
-private:
-  std::atomic<perm_node*> node;
-  rw_lock lock{};
-  uint size;
+  const uint total_blocks;
+  std::vector<perm_node*> roots;
 
 public:
-  permutation(uint size) : node(new perm_node(size)), size(size) {
+  permutation(uint nodes, uint total_blocks) : total_blocks(total_blocks) {
+      roots.resize(nodes);
+      FOR_N(node, nodes) {
+          RUN_NUMA_START(node)
+              roots[node] = new perm_node(total_blocks);
+          RUN_NUMA_END
+      }
   }
 
   ~permutation() {
-      const perm_node* a_node = node.load();
-      delete a_node;
+      FOR_N(i, roots.size()) {
+          delete roots[i];
+      }
   }
 
-  uint get_permutation(uint index) {
-      read_lock_holder h(lock);
-      return node.load()->permutation[index];
+  uint get_total_blocks() {
+      return total_blocks;
   }
 
-  void permute() {
-      if (size == 1) return;
-      perm_node* new_node = new perm_node(size);
-      lock.write_lock();
-      perm_node* current = node.exchange(new_node);
-      lock.write_unlock();
-      delete current;
+  perm_node* get_basic_permutation(uint node) {
+      return roots[node];
   }
 };
 
