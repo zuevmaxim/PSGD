@@ -6,7 +6,7 @@ LIBS=-lpthread -lnuma
 
 all: bin/svm
 
-dirs: bin data
+dirs:
 	mkdir -p "bin"
 	mkdir -p "data"
 
@@ -17,7 +17,7 @@ clean:
 	rm -rf bin/*
 
 
-datasets: data data/rcv1 data/rcv1.t
+datasets: dirs data/rcv1 data/rcv1.t
 data/rcv1.t:
 	wget https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/rcv1_train.binary.bz2
 	bunzip2 rcv1_train.binary.bz2

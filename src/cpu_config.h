@@ -11,6 +11,8 @@
 #include <string>
 #include <sstream>
 #include <fstream>
+#include <cassert>
+#include <algorithm>
 
 
 class cpu_config {

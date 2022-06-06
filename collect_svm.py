@@ -11,7 +11,7 @@ output_dir = "results/svm_" + time.strftime("%m%d-%H%M%S")
 check_call("mkdir -p {}/".format(output_dir), shell=True)
 
 stepdecay_trials_length = 1
-nthreads = [1, 2, 4, 8, 16]
+nthreads = [1, 2, 4, 8, 16, 32, 64, 128]
 algorithms = [
     "HogWild",
     "HogWild++",

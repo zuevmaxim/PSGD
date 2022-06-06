@@ -1,5 +1,5 @@
 test_repeats = 20
-phy_cores = 16
+phy_cores = 64
 datasets = [
     # "a8a",
     # "covtype",

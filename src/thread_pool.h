@@ -9,6 +9,7 @@
 #include "cpu_config.h"
 #include <pthread.h>
 #include <vector>
+#include <cassert>
 #include "barrier_t.h"
 
 

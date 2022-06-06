@@ -7,6 +7,7 @@
 
 #include "vectors.h"
 #include "cpu_config.h"
+#include <cmath>
 
 class abstract_data_scheme {
 public:
@@ -162,7 +163,7 @@ private:
               } else {
                   start = mid;
               }
-          } while (fabs(err) > 0.001);
+          } while (std::fabs(err) > 0.001);
       }
       if (!n)
           mid = .0;
@@ -288,7 +289,7 @@ public:
           fp_type wi = cur_w[i];
           fp_type delta = wi - old_w[i];
           fp_type next = next_w[i];
-          if (fabs(delta) > tolerance) {
+          if (std::fabs(delta) > tolerance) {
               fp_type new_wi = next * lambda + wi * (1 - lambda) + (beta + lambda - 1) * delta;
               next_w[i] = next + beta * delta;
               cur_w[i] = new_wi;

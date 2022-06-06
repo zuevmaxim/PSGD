@@ -13,6 +13,8 @@
 #include <chrono>
 #include <sstream>
 #include <atomic>
+#include <iomanip>
+#include <memory>
 
 
 struct sgd_params {
