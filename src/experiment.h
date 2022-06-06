@@ -237,7 +237,7 @@ struct experiment_configuration {
 
           out << algorithm << ',' << threads << ',' << cluster_size << ',' << (success ? 1 : 0) << ','
               << time.count() << ',' << train_accuracy << ',' << validate_accuracy << ',' << test_accuracy << ','
-              << epochs << ',' << time.count() / average_epochs << ','
+              << average_epochs << ',' << time.count() / average_epochs << ','
               << step_size << ',' << step_decay << ',' << update_delay << ','
               << target_accuracy
               << std::endl;
