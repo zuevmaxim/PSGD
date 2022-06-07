@@ -20,6 +20,7 @@ max_iterations = {
     "HogWild": {"default": 150, "epsilon": 75},
     "HogWild++": {"default": 50, "epsilon": 25},
 }
+block_size = [512]
 maxstepsize = {
     "a8a": 5e-01,
     "covtype": 5e-03,
@@ -127,9 +128,11 @@ for d in datasets:
                     accuracy = target_accuracy[d]
                     step_size = maxstepsize[d]
                     for step_decay in create_step_decay_trials(d, algorithm, cluster_count):
-                        input_file.write("{} {} {} {} {} {} {} {} {}\n"
-                                         .format(algorithm, test_repeats, thread, cluster, epochs,
-                                                 update_delay, accuracy, step_size, step_decay))
+                        for bs in block_size:
+                            input_file.write("{} {} {} {} {} {} {} {} {} {}\n".format(
+                                algorithm, test_repeats, thread, cluster, epochs,
+                                update_delay, accuracy, step_size, step_decay, bs
+                            ))
     input_file.write("exit\n")
     input_file.close()
     cmd_line = "bin/svm data/{} data/{}.t data/{}.t {} {}".format(d, d, d, output_file, input_path)

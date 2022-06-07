@@ -25,6 +25,11 @@ struct sgd_params {
   uint block_size;
 };
 
+uint calc_total_blocks(uint data_size, uint threads, uint block_size) {
+    const uint a = std::max(1u, data_size / (block_size * threads));
+    return a * threads;
+}
+
 class Task {
 public:
   sgd_params params;
@@ -54,7 +59,7 @@ public:
         threads(threads),
         validator(new uint(0)),
         stop(new std::atomic<bool>(false)),
-        perm(new permutation(nodes, train.get_data(0).get_size())),
+        perm(new permutation(nodes, calc_total_blocks(train.get_data(0).get_size(), threads, params->block_size))),
         copy(false) {}
 
   Task(const Task& other)
@@ -84,27 +89,37 @@ void* thread_task(void* args, const uint thread_id) {
     const uint node = config.get_node_for_thread(thread_id);
     const uint phy_threads = std::min(task.threads, config.get_phy_cpus());
     const dataset_local& data = task.train.get_data(node);
-    const uint block_size = data.get_size() / task.threads;
     abstract_data_scheme* const scheme = task.data_scheme;
     vector<fp_type>& w = scheme->get_model_vector(thread_id);
     void* const model_args = scheme->get_model_args(thread_id);
     const ModelUpdate& update = task.model.update;
 
     perm_node* perm_n = task.perm->get_basic_permutation(node);
+    const uint total_blocks = perm_n->size;
+    const uint blocks_per_thread = total_blocks / task.threads;
+    const uint data_size = data.get_size();
+    const uint block_size = data_size / total_blocks;
+
+    const uint start_block = blocks_per_thread * thread_id;
+    const uint end_block = blocks_per_thread * (thread_id + 1);
 
     const uint n = task.params.max_epochs;
-    const uint start = block_size * thread_id;
-    const uint end = std::min(data.get_size(), block_size * (thread_id + 1));
     uint epochs = n;
     FOR_N(e, n) {
         const fp_type step = task.params.step;
         const uint* perm_array = perm_n->permutation;
 
-        // Update cycle must avoid any unnecessary NUMA communication
-        for (uint i = start; i < end; ++i) {
-            const data_point& point = data[perm_array[i]];
-            update(point, w, step, model_args);
-            scheme->post_update(thread_id);
+        for (uint block_index = start_block; block_index < end_block; ++block_index) {
+            const uint block = perm_array[block_index];
+            const uint start = block_size * block;
+            const uint end = block + 1 == total_blocks ? data_size : block_size * (block + 1);
+
+            // Update cycle must avoid any unnecessary NUMA communication
+            for (uint i = start; i < end; ++i) {
+                const data_point& point = data[i];
+                update(point, w, step, model_args);
+                scheme->post_update(thread_id);
+            }
         }
         task.params.step *= task.params.step_decay;
 
@@ -155,6 +170,7 @@ struct experiment_configuration {
 
   std::string algorithm;
   unsigned test_repeats = 1;
+  unsigned block_size = 512;
   unsigned threads = 1, cluster_size = 1, max_epochs = 100, update_delay = 64;
   fp_type target_accuracy = 1, step_size = 0.5, step_decay = 0.8;
   fp_type mu = 1, tolerance = 0.01;
@@ -166,9 +182,9 @@ struct experiment_configuration {
   bool from_string(const std::string& command) {
       std::stringstream ss(command);
 
-      // HogWild 10 2 1 100 128 0.97713 0.5 0.8
+      // HogWild 10 1 1 100 128 0.97713 0.5 0.8 512
       ss >> algorithm >> test_repeats >> threads >> cluster_size >> max_epochs >> update_delay >> target_accuracy
-         >> step_size >> step_decay;
+         >> step_size >> step_decay >> block_size;
       return !ss.fail();
   }
 
@@ -196,6 +212,7 @@ struct experiment_configuration {
       params.target_accuracy = target_accuracy;
       params.step_decay = step_decay;
       params.step = step_size;
+      params.block_size = block_size;
 
       FOR_N(run, test_repeats) {
           std::unique_ptr <abstract_data_scheme> scheme;

@@ -18,8 +18,8 @@ class perm_node {
   friend class permutation;
 
   std::atomic<perm_node*> next;
-  const uint size;
 public:
+  const uint size;
   uint* permutation;
 
   perm_node(uint size) : next(NULL), size(size) {
