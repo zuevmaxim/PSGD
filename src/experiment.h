@@ -33,7 +33,6 @@ uint calc_total_blocks(uint data_size, uint threads, uint block_size) {
 class Task {
 public:
   sgd_params params;
-  Model model;
   abstract_data_scheme* data_scheme;
   const dataset& train;
   const dataset& validate;
@@ -46,13 +45,11 @@ public:
 
   Task(uint nodes,
        sgd_params* params,
-       Model model,
        abstract_data_scheme* data_scheme,
        const dataset& train,
        const dataset& validate,
        uint threads)
       : params(*params),
-        model(model),
         data_scheme(data_scheme->clone()),
         train(train),
         validate(validate),
@@ -64,7 +61,6 @@ public:
 
   Task(const Task& other)
       : params(other.params),
-        model(other.model),
         data_scheme(other.data_scheme->clone()),
         train(other.train),
         validate(other.validate),
@@ -91,8 +87,7 @@ void* thread_task(void* args, const uint thread_id) {
     const dataset_local& data = task.train.get_data(node);
     abstract_data_scheme* const scheme = task.data_scheme;
     vector<fp_type>& w = scheme->get_model_vector(thread_id);
-    void* const model_args = scheme->get_model_args(thread_id);
-    const ModelUpdate& update = task.model.update;
+    MODEL_PARAMS* const model_args = reinterpret_cast<MODEL_PARAMS*>(scheme->get_model_args(thread_id));
 
     perm_node* perm_n = task.perm->get_basic_permutation(node);
     const uint total_blocks = perm_n->size;
@@ -117,7 +112,7 @@ void* thread_task(void* args, const uint thread_id) {
             // Update cycle must avoid any unnecessary NUMA communication
             for (uint i = start; i < end; ++i) {
                 const data_point& point = data[i];
-                update(point, w, step, model_args);
+                MODEL_UPDATE(point, w, step, model_args);
                 scheme->post_update(thread_id);
             }
         }
@@ -129,7 +124,7 @@ void* thread_task(void* args, const uint thread_id) {
             break;
         }
         if (thread_id == *task.validator) {
-            const fp_type accuracy = compute_accuracy(task.model.predict, task.validate, w, node);
+            const fp_type accuracy = compute_accuracy(task.validate, w, node);
             if (accuracy > task.params.target_accuracy) {
                 task.stop->store(true);
                 epochs = e + 1;
@@ -149,11 +144,10 @@ bool run_experiment(
     const dataset& validate,
     thread_pool& tp,
     sgd_params* params,
-    Model model,
     abstract_data_scheme* data_scheme,
     std::vector<void*>& results
 ) {
-    Task task(tp.get_numa_count(), params, model, data_scheme, train, validate, tp.get_size());
+    Task task(tp.get_numa_count(), params, data_scheme, train, validate, tp.get_size());
 
     results = tp.execute(thread_task, &task);
 
@@ -203,10 +197,6 @@ struct experiment_configuration {
       const uint features = train_dataset.get_features();
       SVMParams svm_params(mu, &train_dataset);
 
-      Model model;
-      model.predict = &svm::predict;
-      model.update = &svm::update;
-
       sgd_params params;
       params.max_epochs = max_epochs;
       params.target_accuracy = target_accuracy;
@@ -227,7 +217,7 @@ struct experiment_configuration {
 
           std::vector<void*> results;
           auto start = Time::now();
-          bool success = run_experiment(train_dataset, validate_dataset, tp, &params, model, scheme.get(), results);
+          bool success = run_experiment(train_dataset, validate_dataset, tp, &params, scheme.get(), results);
           auto end = Time::now();
 
           uint epochs = 0;
@@ -238,9 +228,9 @@ struct experiment_configuration {
           }
           fp_type average_epochs = static_cast<fp_type>(epochs) / threads;
 
-          fp_type train_accuracy = compute_accuracy(model.predict, train_dataset, scheme->get_model_vector(0));
-          fp_type validate_accuracy = compute_accuracy(model.predict, validate_dataset, scheme->get_model_vector(0));
-          fp_type test_accuracy = compute_accuracy(model.predict, test_dataset, scheme->get_model_vector(0));
+          fp_type train_accuracy = compute_accuracy(train_dataset, scheme->get_model_vector(0));
+          fp_type validate_accuracy = compute_accuracy(validate_dataset, scheme->get_model_vector(0));
+          fp_type test_accuracy = compute_accuracy(test_dataset, scheme->get_model_vector(0));
           fp_sec time = end - start;
 
           std::cout << std::fixed << std::setprecision(5) << std::setfill(' ')

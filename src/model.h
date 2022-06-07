@@ -36,23 +36,14 @@ private:
   }
 };
 
-typedef void(* ModelUpdate)(const data_point&, vector<fp_type>&, fp_type, void*);
-
-typedef bool(* ModelPredict)(const vector<fp_type>&, const data_point& point);
-
-struct Model {
-  ModelUpdate update;
-  ModelPredict predict;
-};
-
 namespace svm {
-  static bool predict(const vector<fp_type>& w, const data_point& point) {
+  static inline bool predict(const vector<fp_type>& w, const data_point& point) {
       fp_type dot = vectors::dot(w, point.data, point.indices, point.size);
       return dot > 0;
   }
 
-  static void update(const data_point& point, vector<fp_type>& w, const fp_type step, void* args) {
-      SVMParams& params = *reinterpret_cast<SVMParams*>(args);
+  static inline void update(const data_point& point, vector<fp_type>& w, const fp_type step, const SVMParams* args) {
+      const SVMParams& params = *args;
       fp_type wxy = vectors::dot(w, point.data, point.indices, point.size) * point.label;
 
       if (wxy < 1) { // hinge is active.
@@ -74,13 +65,17 @@ namespace svm {
   }
 }
 
-static fp_type compute_accuracy(ModelPredict predict, const dataset& dataset, const vector<fp_type>& w, uint node = 0) {
+#define MODEL_UPDATE svm::update
+#define MODEL_PREDICT svm::predict
+#define MODEL_PARAMS SVMParams
+
+static fp_type compute_accuracy(const dataset& dataset, const vector<fp_type>& w, uint node = 0) {
     const dataset_local& points = dataset.get_data(node);
     const uint size = points.get_size();
     uint correct = 0;
     FOR_N(i, size) {
         const data_point& point = points[i];
-        bool predicted = predict(w, point);
+        bool predicted = MODEL_PREDICT(w, point);
         bool expected = point.label > 0;
         correct += (predicted == expected) ? 1 : 0;
     }
