@@ -59,7 +59,10 @@ namespace vectors {
       fp_type result = 0;
       const fp_type* const __restrict__ a_data = a.data;
       FOR_N(i, size) {
-          result += a_data[indices[i]] * b_data[i];
+          const uint j = indices[i];
+          const fp_type b_val = b_data[i];
+          const fp_type a_val = a_data[j];
+          result += a_val * b_val;
       }
       return result;
   }
@@ -71,7 +74,9 @@ namespace vectors {
                             const fp_type s) {
       fp_type* const __restrict__ a_data = a.data;
       FOR_N(i, size) {
-          a_data[indices[i]] += s * b_data[i];
+          const uint j = indices[i];
+          const fp_type b_val = b_data[i];
+          a_data[j] += s * b_val;
       }
   }
 }
