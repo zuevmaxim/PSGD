@@ -9,6 +9,7 @@
 #include "vectors.h"
 #include "numa.h"
 #include "cpu_config.h"
+#include <algorithm>
 
 const uint SIZE_UINT = sizeof(uint);
 const uint SIZE_FP_TYPE = sizeof(fp_type);
@@ -67,10 +68,16 @@ class dataset_local {
 
   dataset_local(const std::vector <tmp_point>& points) {
       _size = points.size();
+      std::vector<int> p(_size);
+      FOR_N(i, _size) {
+          p[i] = i;
+      }
+      std::random_shuffle(p.begin(), p.end());
 
       data_buffer_size = 0;
       data_buffer_size += SIZE_CHAR_PTR * _size; // pointers to points
-      for (const tmp_point& point: points) {
+      FOR_N(i, _size) {
+          const tmp_point& point = points[p[i]];
           data_buffer_size += SIZE_UINT; // size of point
           data_buffer_size += SIZE_FP_TYPE; // label
           data_buffer_size += SIZE_UINT * point.indices.size();
@@ -80,8 +87,9 @@ class dataset_local {
       points_ptr = reinterpret_cast<char**>(data);
       _features = 0;
       char* buffer = data + SIZE_CHAR_PTR * _size;
-      FOR_N(point_i, _size) {
-          points_ptr[point_i] = buffer;
+      FOR_N(p_i, _size) {
+          const uint point_i = p[p_i];
+          points_ptr[p_i] = buffer;
           const tmp_point& point = points[point_i];
           uint size = point.indices.size();
           *reinterpret_cast<uint*>(buffer) = size;
