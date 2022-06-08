@@ -47,25 +47,6 @@ struct experiment_configuration {
       throw std::runtime_error("This function must not be called!");
   }
 
-  template<>
-  hogwild_data_scheme* create_scheme(uint features, void* model_args) {
-      return new hogwild_data_scheme(features, model_args);
-  }
-
-  template<>
-  hogwild_XX_data_scheme<SVMParams>* create_scheme(uint features, void* model_args) {
-      auto svm_params = reinterpret_cast<SVMParams*>(model_args);
-      hogwild_XX_params params(threads, cluster_size, tolerance, update_delay);
-      return new hogwild_XX_data_scheme<SVMParams>(features, svm_params, params);
-  }
-
-  template<>
-  mywild_data_scheme<SVMParams>* create_scheme(uint features, void* model_args) {
-      auto svm_params = reinterpret_cast<SVMParams*>(model_args);
-      mywild_params params(threads, cluster_size, tolerance, update_delay);
-      return new mywild_data_scheme<SVMParams>(features, svm_params, params);
-  }
-
   template<typename T>
   void run_experiments_internal() {
       std::cout << "Start experiments (" << test_repeats << ") with " << algorithm << " algorithm"
@@ -148,5 +129,24 @@ struct experiment_configuration {
       }
   }
 };
+
+template<>
+hogwild_data_scheme* experiment_configuration::create_scheme(uint features, void* model_args) {
+    return new hogwild_data_scheme(features, model_args);
+}
+
+template<>
+hogwild_XX_data_scheme<SVMParams>* experiment_configuration::create_scheme(uint features, void* model_args) {
+    auto svm_params = reinterpret_cast<SVMParams*>(model_args);
+    hogwild_XX_params params(threads, cluster_size, tolerance, update_delay);
+    return new hogwild_XX_data_scheme<SVMParams>(features, svm_params, params);
+}
+
+template<>
+mywild_data_scheme<SVMParams>* experiment_configuration::create_scheme(uint features, void* model_args) {
+    auto svm_params = reinterpret_cast<SVMParams*>(model_args);
+    mywild_params params(threads, cluster_size, tolerance, update_delay);
+    return new mywild_data_scheme<SVMParams>(features, svm_params, params);
+}
 
 #endif //PSGD_RUN_CONFIGURATION_H
