@@ -19,6 +19,7 @@ struct experiment_configuration {
   const dataset& train_dataset;
   const dataset& test_dataset;
   const dataset& validate_dataset;
+  std::ostream& output;
 
   std::string algorithm;
   unsigned test_repeats = 1;
@@ -29,7 +30,8 @@ struct experiment_configuration {
 
   experiment_configuration(const dataset& train_dataset,
                            const dataset& test_dataset,
-                           const dataset& validate_dataset) : train_dataset(train_dataset), test_dataset(test_dataset), validate_dataset(validate_dataset) {}
+                           const dataset& validate_dataset,
+                           std::ostream& output) : train_dataset(train_dataset), test_dataset(test_dataset), validate_dataset(validate_dataset), output(output) {}
 
   bool from_string(const std::string& command) {
       std::stringstream ss(command);
@@ -42,6 +44,7 @@ struct experiment_configuration {
 
   template<typename T>
   T* create_scheme(uint features, void* model_args) {
+      throw std::runtime_error("This function must not be called!");
   }
 
   template<>
@@ -64,7 +67,7 @@ struct experiment_configuration {
   }
 
   template<typename T>
-  void run_experiments_internal(std::ostream& out) {
+  void run_experiments_internal() {
       std::cout << "Start experiments (" << test_repeats << ") with " << algorithm << " algorithm"
                 << " threads=" << threads
                 << (algorithm == "HogWild" ? "" : " cluster_size=" + std::to_string(cluster_size))
@@ -87,7 +90,7 @@ struct experiment_configuration {
       params.block_size = block_size;
 
       FOR_N(run, test_repeats) {
-          std::unique_ptr <T> scheme(create_scheme<T>(features, &params));
+          std::unique_ptr <T> scheme(create_scheme<T>(features, &svm_params));
 
           std::vector<void*> results;
           auto start = Time::now();
@@ -118,7 +121,8 @@ struct experiment_configuration {
                     << " per_epoch=" << time.count() / average_epochs
                     << std::endl;
 
-          out << algorithm << ',' << threads << ',' << cluster_size << ',' << (success ? 1 : 0) << ','
+          output
+              << algorithm << ',' << threads << ',' << cluster_size << ',' << (success ? 1 : 0) << ','
               << time.count() << ',' << train_accuracy << ',' << validate_accuracy << ',' << test_accuracy << ','
               << average_epochs << ',' << time.count() / average_epochs << ','
               << step_size << ',' << step_decay << ',' << update_delay << ','
@@ -132,13 +136,13 @@ struct experiment_configuration {
       }
   }
 
-  void run_experiments(std::ostream& output_file) {
+  void run_experiments() {
       if (algorithm == "HogWild") {
-          run_experiments_internal<hogwild_data_scheme>(output_file);
+          run_experiments_internal<hogwild_data_scheme>();
       } else if (algorithm == "HogWild++") {
-          run_experiments_internal<hogwild_XX_data_scheme<SVMParams>>(output_file);
+          run_experiments_internal<hogwild_XX_data_scheme<SVMParams>>();
       } else if (algorithm == "MyWild") {
-          run_experiments_internal<mywild_data_scheme<SVMParams>>(output_file);
+          run_experiments_internal<mywild_data_scheme<SVMParams>>();
       } else {
           std::cerr << "Unexpected algorithm: " << algorithm << std::endl;
       }

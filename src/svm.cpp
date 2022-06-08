@@ -50,13 +50,13 @@ int main(int argc, char** argv) {
         if (command.empty()) continue;
         if (command == "exit") break;
 
-        experiment_configuration configuration(train_dataset, test_dataset, validate_dataset);
+        experiment_configuration configuration(train_dataset, test_dataset, validate_dataset, output_file);
         if (!configuration.from_string(command)) {
             std::cerr << "Command failed to parse:\n" << command << std::endl;
             continue;
         }
 
-        configuration.run_experiments(output_file);
+        configuration.run_experiments();
     }
     output_file.close();
     if (input_file.is_open()) input_file.close();
