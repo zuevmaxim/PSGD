@@ -7,7 +7,7 @@
 
 #include "types.h"
 #include "dataset.h"
-#include "data_sceme.h"
+#include "data_scheme.h"
 
 
 struct SVMParams {

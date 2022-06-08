@@ -1,6 +1,6 @@
 #include <iostream>
 #include <fstream>
-#include "experiment.h"
+#include "run_configuration.h"
 
 
 int main(int argc, char** argv) {
