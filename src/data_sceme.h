@@ -16,7 +16,7 @@ public:
 
   virtual vector<fp_type>& get_model_vector(uint thread_id) = 0;
 
-  virtual void post_update(uint thread_id) = 0;
+  virtual void post_update(uint thread_id, fp_type step) = 0;
 
   virtual abstract_data_scheme* clone() = 0;
 
@@ -24,7 +24,7 @@ public:
   }
 };
 
-class hogwild_data_scheme : public abstract_data_scheme {
+class hogwild_data_scheme final : public abstract_data_scheme {
 private:
   vector<fp_type>* w;
   void* const args;
@@ -54,10 +54,10 @@ public:
       return *w;
   }
 
-  void post_update(uint thread_id) override {
+  void post_update(uint thread_id, fp_type step) override {
   }
 
-  abstract_data_scheme* clone() override {
+  hogwild_data_scheme* clone() override {
       return new hogwild_data_scheme(*this);
   }
 };
@@ -172,7 +172,7 @@ private:
 };
 
 template<typename ModelParams>
-class hogwild_XX_data_scheme : public abstract_data_scheme {
+class hogwild_XX_data_scheme final : public abstract_data_scheme {
 private:
   const bool copy;
   vector<vector<fp_type>*> old_w;
@@ -225,8 +225,8 @@ public:
       next.init(size);
       FOR_N(thread_id, params.threads) {
           next[thread_id] = params.cluster_count > 1 && thread_id < params.phy_threads
-              ? (thread_id + params.cluster_size) % params.phy_threads
-              : -1;
+                            ? (thread_id + params.cluster_size) % params.phy_threads
+                            : -1;
       }
   }
 
@@ -259,11 +259,11 @@ public:
       return *w[thread_to_model[thread_id]];
   }
 
-  abstract_data_scheme* clone() override {
+  hogwild_XX_data_scheme<ModelParams>* clone() override {
       return new hogwild_XX_data_scheme(*this);
   }
 
-  void post_update(uint thread_id) override {
+  void post_update(uint thread_id, const fp_type step) override {
       if (--delay > 0) return;
 
       const int next_id = next[thread_id];
@@ -273,7 +273,7 @@ public:
       const uint model = thread_to_model[thread_id];
       const uint next_model = thread_to_model[next_id];
       if (model == next_model) {
-          throw std::runtime_error("AAA");
+          throw std::runtime_error("Next model equals current model.");
       }
 
       const uint size = old_w[model]->size;
@@ -286,16 +286,16 @@ public:
       const fp_type tolerance = params.tolerance;
 
       FOR_N(i, size) {
-          fp_type wi = cur_w[i];
-          fp_type delta = wi - old_w[i];
-          fp_type next = next_w[i];
+          const fp_type wi = cur_w[i];
+          const fp_type delta = (wi - old_w[i]) * step;
+          const fp_type next = next_w[i];
           if (std::fabs(delta) > tolerance) {
-              fp_type new_wi = next * lambda + wi * (1 - lambda) + (beta + lambda - 1) * delta;
+              const fp_type new_wi = next * lambda + wi * (1 - lambda) + (beta + lambda - 1) * delta;
               next_w[i] = next + beta * delta;
               cur_w[i] = new_wi;
               old_w[i] = new_wi;
           } else {
-              fp_type new_wi = next * lambda + wi * (1 - lambda) + lambda * delta;
+              const fp_type new_wi = next * lambda + wi * (1 - lambda) + lambda * delta;
               cur_w[i] = new_wi;
               old_w[i] = new_wi - delta;
           }

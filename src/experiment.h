@@ -30,10 +30,11 @@ uint calc_total_blocks(uint data_size, uint threads, uint block_size) {
     return a * threads;
 }
 
+template<typename T>
 class Task {
 public:
   sgd_params params;
-  abstract_data_scheme* data_scheme;
+  T* data_scheme;
   const dataset& train;
   const dataset& validate;
   const uint threads;
@@ -45,7 +46,7 @@ public:
 
   Task(uint nodes,
        sgd_params* params,
-       abstract_data_scheme* data_scheme,
+       T* data_scheme,
        const dataset& train,
        const dataset& validate,
        uint threads)
@@ -79,13 +80,14 @@ public:
   }
 };
 
+template<typename T>
 void* thread_task(void* args, const uint thread_id) {
-    Task task = *reinterpret_cast<Task*>(args);
+    Task<T> task = *reinterpret_cast<Task<T>*>(args);
 
     const uint node = config.get_node_for_thread(thread_id);
     const uint phy_threads = std::min(task.threads, config.get_phy_cpus());
     const dataset_local& data = task.train.get_data(node);
-    abstract_data_scheme* const scheme = task.data_scheme;
+    T* const scheme = task.data_scheme;
     vector<fp_type>& w = scheme->get_model_vector(thread_id);
     MODEL_PARAMS* const model_args = reinterpret_cast<MODEL_PARAMS*>(scheme->get_model_args(thread_id));
 
@@ -113,7 +115,7 @@ void* thread_task(void* args, const uint thread_id) {
             for (uint i = start; i < end; ++i) {
                 const data_point& point = data[i];
                 MODEL_UPDATE(point, w, step, model_args);
-                scheme->post_update(thread_id);
+                scheme->post_update(thread_id, step);
             }
         }
         task.params.step *= task.params.step_decay;
@@ -139,17 +141,18 @@ void* thread_task(void* args, const uint thread_id) {
     return new uint(epochs);
 }
 
+template<typename T>
 bool run_experiment(
     const dataset& train,
     const dataset& validate,
     thread_pool& tp,
     sgd_params* params,
-    abstract_data_scheme* data_scheme,
+    T* data_scheme,
     std::vector<void*>& results
 ) {
-    Task task(tp.get_numa_count(), params, data_scheme, train, validate, tp.get_size());
+    Task<T> task(tp.get_numa_count(), params, data_scheme, train, validate, tp.get_size());
 
-    results = tp.execute(thread_task, &task);
+    results = tp.execute(thread_task<T>, &task);
 
     return *task.stop;
 }
@@ -217,7 +220,14 @@ struct experiment_configuration {
 
           std::vector<void*> results;
           auto start = Time::now();
-          bool success = run_experiment(train_dataset, validate_dataset, tp, &params, scheme.get(), results);
+          bool success;
+          if (algorithm == "HogWild") {
+              auto sch = reinterpret_cast<hogwild_data_scheme*>(scheme.get());
+              success = run_experiment<hogwild_data_scheme>(train_dataset, validate_dataset, tp, &params, sch, results);
+          } else if (algorithm == "HogWild++") {
+              auto sch = reinterpret_cast<hogwild_XX_data_scheme<SVMParams>*>(scheme.get());
+              success = run_experiment<hogwild_XX_data_scheme<SVMParams>>(train_dataset, validate_dataset, tp, &params, sch, results);
+          }
           auto end = Time::now();
 
           uint epochs = 0;
