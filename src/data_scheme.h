@@ -22,7 +22,7 @@
 
 class hogwild_data_scheme final {
 private:
-  vector<fp_type>* w;
+  vector<fp_type>* const w;
   void* const args;
   const bool copy;
 

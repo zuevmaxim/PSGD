@@ -43,7 +43,8 @@ std::vector<tmp_point> load_dataset_from_file(const std::string& name) {
         fp_type x{};
         int index{};
         char c{};
-        ss >> p.label;
+        ss >> x;
+        p.label = (x == 1.0) ? 1.0 : -1.0;
         while (ss >> index >> c >> x) {
             if (c != ':' || index < 0) {
                 std::cerr << "Warning! error while reading dataset, split symbol is " << c << " index=" << index << name << std::endl;

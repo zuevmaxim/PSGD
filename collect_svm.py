@@ -5,20 +5,28 @@ import sys
 import time
 from subprocess import check_call
 
-from common import *
-
-output_dir = "results/svm_" + time.strftime("%m%d-%H%M%S")
-check_call("mkdir -p {}/".format(output_dir), shell=True)
-
+test_repeats = 10
+phy_cores = 16
+datasets = [
+    # "a8a",
+    # "covtype",
+    # "webspam",
+    # "music",
+    "rcv1",
+    # "epsilon",
+    # "news20"
+]
 stepdecay_trials_length = 1
-nthreads = [1, 2, 4, 8, 16, 32, 64, 128]
+nthreads = [1, 2, 4, 8, 16]
 algorithms = [
     "HogWild",
     "HogWild++",
+    "MyWild"
 ]
 max_iterations = {
     "HogWild": {"default": 150, "epsilon": 75},
     "HogWild++": {"default": 50, "epsilon": 25},
+    "MyWild": {"default": 50, "epsilon": 25},
 }
 block_size = [512]
 maxstepsize = {
@@ -53,7 +61,7 @@ stepdecay_per_dataset = {
 def get_clusters(algorithm, threads):
     if algorithm == "HogWild":
         return [threads]
-    return [y for y in [threads // x for x in [2, 4]] if y >= 1]
+    return [y for y in [threads // x for x in [2]] if y >= 1]
 
 
 def generate_update_delays(algorithm, nweights):
@@ -109,6 +117,9 @@ def get_effective_epochs(a, c, e):
     effective_epochs = max(150, effective_epochs)
     return effective_epochs
 
+
+output_dir = "results/svm_" + time.strftime("%m%d-%H%M%S")
+check_call("mkdir -p {}/".format(output_dir), shell=True)
 
 for d in datasets:
     output_file = "{}/{}.csv".format(output_dir, d)

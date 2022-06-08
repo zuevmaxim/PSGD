@@ -12,8 +12,6 @@
 #include <chrono>
 #include <algorithm>
 
-class permutation;
-
 class perm_node {
   std::atomic<perm_node*> next;
 public:
@@ -53,11 +51,10 @@ public:
 };
 
 class permutation {
-  const uint total_blocks;
   std::vector<perm_node*> roots;
 
 public:
-  permutation(uint nodes, uint total_blocks) : total_blocks(total_blocks) {
+  permutation(uint nodes, uint total_blocks) {
       roots.resize(nodes);
       FOR_N(node, nodes) {
           RUN_NUMA_START(node)
@@ -70,10 +67,6 @@ public:
       FOR_N(i, roots.size()) {
           delete roots[i];
       }
-  }
-
-  uint get_total_blocks() {
-      return total_blocks;
   }
 
   perm_node* get_basic_permutation(uint node) {
