@@ -27,8 +27,6 @@ private:
 
 
 public:
-
-
   cpu_config() {
       get_topology();
   }
