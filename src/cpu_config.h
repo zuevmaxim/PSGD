@@ -13,6 +13,7 @@
 #include <fstream>
 #include <cassert>
 #include <algorithm>
+#include <unordered_set>
 
 
 class cpu_config {
@@ -32,23 +33,23 @@ public:
   }
 
   void bind_to_cpu(unsigned thread_id) {
-      struct bitmask* cpu_mask;
       int cpu = thread_core_mapping[thread_id];
+      struct bitmask* cpu_mask;
       cpu_mask = numa_allocate_cpumask();
       numa_bitmask_setbit(cpu_mask, cpu);
       numa_sched_setaffinity(0, cpu_mask);
       numa_free_cpumask(cpu_mask);
   }
 
-  unsigned get_numa_count() {
+  unsigned get_numa_count() const {
       return nodes;
   }
 
-  unsigned get_phy_cpus() {
+  unsigned get_phy_cpus() const {
       return phy_cpus;
   }
 
-  unsigned get_node_for_thread(unsigned thread_id) {
+  unsigned get_node_for_thread(unsigned thread_id) const {
       return thread_node_mapping[thread_id];
   }
 
@@ -61,7 +62,7 @@ private:
       cpu_ids.resize(nodes);
       thread_core_mapping.resize(cpus);
       thread_node_mapping.resize(cpus);
-      std::vector<int> known_siblings;
+      std::unordered_set<int> known_siblings;
       for (unsigned cpu = 0; cpu < cpus; ++cpu) {
           // skip a core if it is a hyper-threaded logical core
           if (std::find(known_siblings.begin(), known_siblings.end(), cpu) != known_siblings.end()) continue;
@@ -79,7 +80,7 @@ private:
               std::istringstream ss(siblings);
               std::string core_id;
               while (std::getline(ss, core_id, ',')) {
-                  known_siblings.push_back(atoi(core_id.c_str()));
+                  known_siblings.insert(atoi(core_id.c_str()));
                   phy_core.push_back(atoi(core_id.c_str()));
               }
           } else {
@@ -91,6 +92,8 @@ private:
 
       for (int cpu = 0; cpu < cpus; ++cpu) {
           assign_thread_affinity(cpu);
+          assert(cpu == thread_core_mapping[cpu]);
+          assert(numa_node_of_cpu(cpu) == thread_node_mapping[cpu]);
       }
 
       std::cout << "CPUs: " << cpus << "\n";

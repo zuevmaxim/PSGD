@@ -34,21 +34,21 @@ private:
 };
 
 namespace svm {
-  static inline bool predict(const vector<fp_type>& w, const data_point& point) {
-      fp_type dot = vectors::dot(w, point.data, point.indices, point.size);
+  static inline bool predict(const vector<fp_type>* w, const data_point& point) {
+      fp_type dot = vectors::dot(w->data, point.data, point.indices, point.size);
       return dot > 0;
   }
 
-  static inline void update(const data_point& point, vector<fp_type>& w, const fp_type step, const SVMParams* args) {
+  static inline void update(const data_point& point, vector<fp_type>* w, const fp_type step, const SVMParams* args) {
       const SVMParams& params = *args;
-      fp_type wxy = vectors::dot(w, point.data, point.indices, point.size) * point.label;
+      fp_type wxy = vectors::dot(w->data, point.data, point.indices, point.size) * point.label;
 
       if (wxy < 1) { // hinge is active.
           const fp_type e = step * point.label;
-          vectors::scale_and_add(w, point.data, point.indices, point.size, e);
+          vectors::scale_and_add(w->data, point.data, point.indices, point.size, e);
       }
 
-      fp_type* const __restrict__ vals = w.data;
+      fp_type* const __restrict__ vals = w->data;
       const uint* const __restrict__ degrees = params.degrees.data;
       const uint* const __restrict__ indices = point.indices;
       const uint size = point.size;
@@ -66,7 +66,7 @@ namespace svm {
 #define MODEL_PREDICT svm::predict
 #define MODEL_PARAMS SVMParams
 
-static fp_type compute_accuracy(const dataset& dataset, const vector<fp_type>& w, uint node = 0) {
+static fp_type compute_accuracy(const dataset& dataset, const vector<fp_type>* w, uint node = 0) {
     const dataset_local& points = dataset.get_data(node);
     const uint size = points.get_size();
     uint correct = 0;

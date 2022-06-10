@@ -15,7 +15,7 @@
 //
 // class abstract_data_scheme {
 //   virtual void* get_model_args(uint thread_id) = 0;
-//   virtual vector<fp_type>& get_model_vector(uint thread_id) = 0;
+//   virtual vector<fp_type>* get_model_vector(uint thread_id) = 0;
 //   virtual void post_update(uint thread_id, fp_type step) = 0;
 //   virtual abstract_data_scheme* clone() = 0;
 // };
@@ -43,8 +43,8 @@ public:
       return args;
   }
 
-  vector<fp_type>& get_model_vector(uint thread_id) {
-      return *w;
+  vector<fp_type>* get_model_vector(uint thread_id) {
+      return w;
   }
 
   void post_update(uint thread_id, fp_type step) {
@@ -177,8 +177,8 @@ public:
       return model_params[thread_to_model[thread_id]];
   }
 
-  vector<fp_type>& get_model_vector(uint thread_id) {
-      return *w[thread_to_model[thread_id]];
+  vector<fp_type>* get_model_vector(uint thread_id) {
+      return w[thread_to_model[thread_id]];
   }
 
   hogwild_XX_data_scheme<ModelParams>* clone() {
@@ -315,8 +315,8 @@ public:
       return model_params[thread_to_model[thread_id]];
   }
 
-  vector<fp_type>& get_model_vector(uint thread_id) {
-      return *w[thread_to_model[thread_id]];
+  vector<fp_type>* get_model_vector(uint thread_id) {
+      return w[thread_to_model[thread_id]];
   }
 
   mywild_data_scheme<ModelParams>* clone() {

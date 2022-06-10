@@ -50,22 +50,12 @@ public:
   }
 };
 
-struct sparse_vector {
-  const uint size;
-  const uint* const indices;
-  const fp_type* const data;
-
-  sparse_vector(uint size, const uint* indices, const fp_type* data) : size(size), indices(indices), data(data) {}
-};
-
-
 namespace vectors {
-  inline fp_type dot(const vector<fp_type>& a,
+  inline fp_type dot(const fp_type* const __restrict__ a_data,
                      const fp_type* const __restrict__ b_data,
                      const uint* __restrict__ indices,
                      const uint size) {
       fp_type result = 0;
-      const fp_type* const __restrict__ a_data = a.data;
       FOR_N(i, size) {
           const uint j = indices[i];
           const fp_type b_val = b_data[i];
@@ -75,12 +65,11 @@ namespace vectors {
       return result;
   }
 
-  inline void scale_and_add(vector<fp_type>& a,
+  inline void scale_and_add(fp_type* const __restrict__ a_data,
                             const fp_type* const __restrict__ b_data,
                             const uint* __restrict__ indices,
                             const uint size,
                             const fp_type s) {
-      fp_type* const __restrict__ a_data = a.data;
       FOR_N(i, size) {
           const uint j = indices[i];
           const fp_type b_val = b_data[i];
