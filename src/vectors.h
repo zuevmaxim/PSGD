@@ -6,6 +6,7 @@
 #define PSGD_VECTOR_H
 
 #include "types.h"
+#include <cassert>
 
 template<typename T>
 class vector {
@@ -24,6 +25,7 @@ public:
 
   void init(uint size) {
       this->size = size;
+      assert(data == NULL);
       data = new T[size];
   }
 

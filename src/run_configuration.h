@@ -70,12 +70,17 @@ struct experiment_configuration {
       params.step = step_size;
       params.block_size = block_size;
 
+      bool success;
+      fp_type total_time = 0;
+      fp_type total_epochs = 0;
+      fp_type total_epoch_time = 0;
+
       FOR_N(run, test_repeats) {
           std::unique_ptr <T> scheme(create_scheme<T>(features, &svm_params));
 
           std::vector<void*> results;
           auto start = Time::now();
-          bool success = run_experiment<T>(train_dataset, validate_dataset, tp, &params, scheme.get(), results);
+          success = run_experiment<T>(train_dataset, validate_dataset, tp, &params, scheme.get(), results);
           auto end = Time::now();
 
           uint epochs = 0;
@@ -89,7 +94,8 @@ struct experiment_configuration {
           fp_type train_accuracy = compute_accuracy(train_dataset, scheme->get_model_vector(0));
           fp_type validate_accuracy = compute_accuracy(validate_dataset, scheme->get_model_vector(0));
           fp_type test_accuracy = compute_accuracy(test_dataset, scheme->get_model_vector(0));
-          fp_sec time = end - start;
+          fp_type time = static_cast<fp_sec>(end - start).count();
+          fp_type epoch_time = time / average_epochs;
 
           std::cout << std::fixed << std::setprecision(5) << std::setfill(' ')
                     << "Experiment " << run + 1 << "/" << test_repeats
@@ -97,15 +103,15 @@ struct experiment_configuration {
                     << " train=" << train_accuracy
                     << " validate=" << validate_accuracy
                     << " test=" << test_accuracy
-                    << " time=" << time.count()
+                    << " time=" << time
                     << " epochs=" << average_epochs
-                    << " per_epoch=" << time.count() / average_epochs
+                    << " per_epoch=" << epoch_time
                     << std::endl;
 
           output
               << algorithm << ',' << threads << ',' << cluster_size << ',' << (success ? 1 : 0) << ','
-              << time.count() << ',' << train_accuracy << ',' << validate_accuracy << ',' << test_accuracy << ','
-              << average_epochs << ',' << time.count() / average_epochs << ','
+              << time << ',' << train_accuracy << ',' << validate_accuracy << ',' << test_accuracy << ','
+              << average_epochs << ',' << epoch_time << ','
               << step_size << ',' << step_decay << ',' << update_delay << ','
               << target_accuracy
               << std::endl;
@@ -114,6 +120,21 @@ struct experiment_configuration {
               std::cerr << "Break experiments!" << std::endl;
               break;
           }
+
+          total_time += time;
+          total_epochs += average_epochs;
+          total_epoch_time += epoch_time;
+      }
+      if (success) {
+          total_time /= test_repeats;
+          total_epochs /= test_repeats;
+          total_epoch_time /= test_repeats;
+
+          std::cout << "Average results:"
+          << " time=" << total_time
+          << " epochs=" << total_epochs
+          << " epoch_time=" << total_epoch_time
+          << std::endl;
       }
   }
 
