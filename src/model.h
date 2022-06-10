@@ -66,12 +66,11 @@ namespace svm {
 #define MODEL_PREDICT svm::predict
 #define MODEL_PARAMS SVMParams
 
-static fp_type compute_accuracy(const dataset& dataset, const vector<fp_type>* w, uint node = 0) {
-    const dataset_local& points = dataset.get_data(node);
-    const uint size = points.get_size();
+static fp_type compute_accuracy(const dataset_local& dataset, const vector<fp_type>* w) {
+    const uint size = dataset.get_size();
     uint correct = 0;
     FOR_N(i, size) {
-        const data_point& point = points[i];
+        const data_point point = dataset[i];
         bool predicted = MODEL_PREDICT(w, point);
         bool expected = point.label > 0;
         correct += (predicted == expected) ? 1 : 0;

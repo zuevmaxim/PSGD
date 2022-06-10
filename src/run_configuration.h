@@ -91,9 +91,9 @@ struct experiment_configuration {
           }
           fp_type average_epochs = static_cast<fp_type>(epochs) / threads;
 
-          fp_type train_accuracy = compute_accuracy(train_dataset, scheme->get_model_vector(0));
-          fp_type validate_accuracy = compute_accuracy(validate_dataset, scheme->get_model_vector(0));
-          fp_type test_accuracy = compute_accuracy(test_dataset, scheme->get_model_vector(0));
+          fp_type train_accuracy = compute_accuracy(train_dataset.get_data(0), scheme->get_model_vector(0));
+          fp_type validate_accuracy = compute_accuracy(validate_dataset.get_data(0), scheme->get_model_vector(0));
+          fp_type test_accuracy = compute_accuracy(test_dataset.get_data(0), scheme->get_model_vector(0));
           fp_type time = static_cast<fp_sec>(end - start).count();
           fp_type epoch_time = time / average_epochs;
 
