@@ -14,20 +14,25 @@
 
 class perm_node {
   std::atomic<perm_node*> next;
-public:
-  const uint size;
-  uint* permutation;
-
-  perm_node(uint size) : next(NULL), size(size) {
-      permutation = new uint[size];
+  
+  static const uint* generate_permutation(uint size) {
+      uint* permutation = new uint[size];
       FOR_N(i, size) {
           permutation[i] = i;
       }
-      const uint seed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+      const auto ns = std::chrono::high_resolution_clock::now().time_since_epoch();
+      const uint seed = std::chrono::duration_cast<std::chrono::nanoseconds>(ns).count();
       std::mt19937 gen;
       gen.seed(seed);
       std::shuffle(permutation, permutation + size, gen);
+      return permutation;
   }
+  
+public:
+  const uint size;
+  const uint* const permutation;
+
+  perm_node(uint size) : next(NULL), size(size), permutation(generate_permutation(size)) {}
 
   ~perm_node() {
       perm_node* next_node = next.load();
