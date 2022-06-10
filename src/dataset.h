@@ -28,7 +28,7 @@ struct data_point {
   const fp_type* data;
 };
 
-std::vector<tmp_point> load_dataset_from_file(const std::string& name) {
+std::vector <tmp_point> load_dataset_from_file(const std::string& name) {
     std::ifstream in;
     in.open(name);
     if (!in) {
@@ -115,7 +115,7 @@ public:
   dataset_local(const std::string& name) : dataset_local(load_dataset_from_file(name)) {}
 
   dataset_local(const dataset_local& other) : _size(other._size), _features(other._features), data_buffer_size(other.data_buffer_size) {
-      data = new char [data_buffer_size];
+      data = new char[data_buffer_size];
       std::copy(other.data, other.data + data_buffer_size, data);
       points_ptr = reinterpret_cast<char**>(data);
   }
@@ -143,7 +143,7 @@ public:
   }
 
   ~dataset_local() {
-      delete data;
+      delete[] data;
   }
 };
 
