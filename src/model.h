@@ -20,10 +20,7 @@ private:
   static vector<uint> calc_degrees(const dataset* dataset) {
       const uint features = dataset->get_features();
       vector<uint> degrees;
-      degrees.init(features);
-      FOR_N(i, features) {
-          degrees[i] = 0;
-      }
+      degrees.init(features, 0);
       const dataset_local& points = dataset->get_data(0);
       const uint size = points.get_size();
       FOR_N(i, size) {

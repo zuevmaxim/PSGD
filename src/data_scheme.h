@@ -30,10 +30,7 @@ private:
 
 public:
   hogwild_data_scheme(uint size, void* args) : w(new vector<fp_type>), args(args), copy(false) {
-      w->init(size);
-      FOR_N(i, size) {
-          (*w)[i] = 0;
-      }
+      w->init(size, 0);
   }
 
   ~hogwild_data_scheme() {
@@ -143,18 +140,10 @@ public:
           RUN_NUMA_START(node)
 
               w[cluster] = new vector<fp_type>;
-              auto& model = *w[cluster];
-              model.init(size);
-              FOR_N(i, size) {
-                  model[i] = 0.0;
-              }
+              w[cluster]->init(size, 0.0);
 
               old_w[cluster] = new vector<fp_type>;
-              auto& old_model = *old_w[cluster];
-              old_model.init(size);
-              FOR_N(i, size) {
-                  old_model[i] = 0.0;
-              }
+              old_w[cluster]->init(size, 0.0);
 
               model_params[cluster] = new ModelParams(*args);
           RUN_NUMA_END
@@ -293,11 +282,7 @@ public:
           RUN_NUMA_START(node)
 
               w[cluster] = new vector<fp_type>;
-              auto& model = *w[cluster];
-              model.init(size);
-              FOR_N(i, size) {
-                  model[i] = 0.0;
-              }
+              w[cluster]->init(size, 0.0);
 
               model_params[cluster] = new ModelParams(*args);
           RUN_NUMA_END

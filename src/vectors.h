@@ -7,6 +7,7 @@
 
 #include "types.h"
 #include <cassert>
+#include <algorithm>
 
 template<typename T>
 class vector {
@@ -27,6 +28,11 @@ public:
       this->size = size;
       assert(data == NULL);
       data = new T[size];
+  }
+
+  void init(uint size, const T& value) {
+      init(size);
+      std::fill(data, data + size, value);
   }
 
   T& operator[](unsigned index) {
