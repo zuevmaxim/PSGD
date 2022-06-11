@@ -20,11 +20,7 @@ class perm_node {
       FOR_N(i, size) {
           permutation[i] = i;
       }
-      const auto ns = std::chrono::high_resolution_clock::now().time_since_epoch();
-      const uint seed = std::chrono::duration_cast<std::chrono::nanoseconds>(ns).count();
-      std::mt19937 gen;
-      gen.seed(seed);
-      std::shuffle(permutation, permutation + size, gen);
+      shuffle(permutation, size);
       return permutation;
   }
   
@@ -53,22 +49,33 @@ public:
       }
       return next.load();
   }
+
+  static void shuffle(uint* permutation, uint size) {
+      const auto ns = std::chrono::high_resolution_clock::now().time_since_epoch();
+      const uint seed = std::chrono::duration_cast<std::chrono::nanoseconds>(ns).count();
+      std::mt19937 gen;
+      gen.seed(seed);
+      std::shuffle(permutation, permutation + size, gen);
+  }
 };
 
 class permutation {
+  perm_node* cluster_permutation;
   std::vector<perm_node*> roots;
 
 public:
-  permutation(uint nodes, uint total_blocks) {
+  permutation(uint nodes, uint perm_size, uint clusters) {
+      cluster_permutation = new perm_node(clusters);
       roots.resize(nodes);
       FOR_N(node, nodes) {
           RUN_NUMA_START(node)
-              roots[node] = new perm_node(total_blocks);
+              roots[node] = new perm_node(perm_size);
           RUN_NUMA_END
       }
   }
 
   ~permutation() {
+      delete cluster_permutation;
       FOR_N(i, roots.size()) {
           delete roots[i];
       }
@@ -76,6 +83,10 @@ public:
 
   perm_node* get_basic_permutation(uint node) {
       return roots[node];
+  }
+
+  perm_node* get_cluster_permutation() {
+      return cluster_permutation;
   }
 };
 
