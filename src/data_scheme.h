@@ -18,6 +18,7 @@
 //   virtual vector<fp_type>* get_model_vector(uint thread_id) = 0;
 //   virtual void post_update(uint thread_id, fp_type step) = 0;
 //   virtual abstract_data_scheme* clone() = 0;
+//   virtual uint number_of_copies() const = 0;
 // };
 
 class hogwild_data_scheme final {
@@ -47,11 +48,14 @@ public:
       return w;
   }
 
-  void post_update(uint thread_id, fp_type step) {
-  }
+  void post_update(uint thread_id, fp_type step) {}
 
   hogwild_data_scheme* clone() {
       return new hogwild_data_scheme(*this);
+  }
+
+  uint number_of_copies() const {
+      return 1;
   }
 };
 
@@ -226,6 +230,10 @@ public:
       delay = params.delay;
       *sync_thread = next_id;
   }
+
+  uint number_of_copies() const {
+      return params.cluster_count;
+  }
 };
 
 struct mywild_params {
@@ -235,6 +243,7 @@ struct mywild_params {
   const uint phy_threads;
   const uint cluster_count;
   const uint delay;
+
   mywild_params(uint threads, uint cluster_size, fp_type tolerance, uint delay)
       : threads(threads),
         cluster_size(cluster_size),
@@ -350,6 +359,10 @@ public:
 
       delay = params.delay;
       *sync_thread = next_id;
+  }
+
+  uint number_of_copies() const {
+      return params.cluster_count;
   }
 };
 
