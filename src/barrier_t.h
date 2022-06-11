@@ -7,6 +7,8 @@
 
 #include <pthread.h>
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
 
 /*
  * The purpose of this file is to allow the threading tools to be ported to
@@ -18,8 +20,8 @@
 #ifdef __APPLE__ \
     // we have to use our own barrier and timer
 struct barrier_t {
-    pthread_mutex_t mux;
-    pthread_cond_t cond;
+    std::mutex mux;
+    std::condition_variable cond;
     int total;
     std::atomic<int> current;
 };
@@ -29,8 +31,6 @@ typedef pthread_barrier_t barrier_t;
 
 int barrier_init(barrier_t* b, void* attr, int count) {
 #ifdef __APPLE__
-    pthread_mutex_init(&b->mux, NULL);
-    pthread_cond_init(&b->cond, NULL);
     b->current.store(count);
     b->total = count;
     return 0;
@@ -41,22 +41,18 @@ int barrier_init(barrier_t* b, void* attr, int count) {
 
 int barrier_wait(barrier_t* b) {
 #ifdef __APPLE__
-    pthread_mutex_lock(&b->mux);
-    b->current.fetch_add(-1);
-    if (b->current.load() == 0) {
+    std::unique_lock<std::mutex> lock(b->mux);
+    if (b->current.fetch_add(-1) == 1) {
       // reset the count
       b->current.store(b->total);
       // wake up everyone, we're the last to the fence
-      pthread_cond_broadcast(&b->cond);
-      pthread_mutex_unlock(&b->mux);
+      b->cond.notify_all();
       return 0;
     }
     // otherwise, wait the fence
     while (b->current.load() != b->total) {
-        pthread_cond_wait(&b->cond, &b->mux);
+        b->cond.wait(lock);
     }
-    // release the mux
-    pthread_mutex_unlock(&b->mux);
     return 0;
 #else
     return pthread_barrier_wait(b);
@@ -66,7 +62,7 @@ int barrier_wait(barrier_t* b) {
 
 int barrier_destroy(barrier_t* b) {
 #ifdef __APPLE__
-    return -1;
+    return 0;
 #else
     return pthread_barrier_destroy(b);
 #endif

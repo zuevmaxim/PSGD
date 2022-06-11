@@ -19,9 +19,7 @@ public:
 
   vector(const vector& other) {
       init(other.size);
-      FOR_N(i, size) {
-          data[i] = other.data[i];
-      }
+      std::copy(other.data, other.data + size, data);
   }
 
   void init(uint size) {
@@ -35,11 +33,11 @@ public:
       std::fill(data, data + size, value);
   }
 
-  T& operator[](unsigned index) {
+  inline T& operator[](unsigned index) {
       return data[index];
   }
 
-  const T& operator[](unsigned index) const {
+  inline const T& operator[](unsigned index) const {
       return data[index];
   }
 

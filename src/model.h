@@ -24,7 +24,7 @@ private:
       const dataset_local& points = dataset->get_data(0);
       const uint size = points.get_size();
       FOR_N(i, size) {
-          const data_point& point = points[i];
+          const data_point point = points[i];
           FOR_N(j, point.size) {
               degrees[point.indices[j]]++;
           }
@@ -40,20 +40,18 @@ namespace svm {
   }
 
   static inline void update(const data_point& point, vector<fp_type>* w, const fp_type step, const SVMParams* args) {
-      const SVMParams& params = *args;
-      fp_type wxy = vectors::dot(w->data, point.data, point.indices, point.size) * point.label;
+      const uint size = point.size;
+      const uint* const __restrict__ indices = point.indices;
+      fp_type* const __restrict__ vals = w->data;
+      const fp_type wxy = vectors::dot(vals, point.data, indices, size) * point.label;
 
       if (wxy < 1) { // hinge is active.
           const fp_type e = step * point.label;
-          vectors::scale_and_add(w->data, point.data, point.indices, point.size, e);
+          vectors::scale_and_add(vals, point.data, indices, size, e);
       }
 
-      fp_type* const __restrict__ vals = w->data;
-      const uint* const __restrict__ degrees = params.degrees.data;
-      const uint* const __restrict__ indices = point.indices;
-      const uint size = point.size;
-
-      const fp_type scalar = step * params.mu;
+      const uint* const __restrict__ degrees = args->degrees.data;
+      const fp_type scalar = step * args->mu;
       FOR_N(i, size) {
           const int j = indices[i];
           const unsigned deg = degrees[j];

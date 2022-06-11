@@ -171,11 +171,11 @@ public:
       }
   }
 
-  const dataset_local& get_data(uint node) const {
+  inline const dataset_local& get_data(uint node) const {
       return *datasets[node];
   }
 
-  uint get_features() const {
+  inline uint get_features() const {
       return datasets[0]->get_features();
   }
 };

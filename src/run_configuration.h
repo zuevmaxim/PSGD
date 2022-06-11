@@ -113,7 +113,7 @@ struct experiment_configuration {
               << time << ',' << train_accuracy << ',' << validate_accuracy << ',' << test_accuracy << ','
               << average_epochs << ',' << epoch_time << ','
               << step_size << ',' << step_decay << ',' << update_delay << ','
-              << target_accuracy
+              << target_accuracy << ',' << block_size
               << std::endl;
 
           if (!success) {
@@ -130,7 +130,10 @@ struct experiment_configuration {
           total_epochs /= test_repeats;
           total_epoch_time /= test_repeats;
 
-          std::cout << "Average results:"
+          std::cout << "\nAverage results:"
+          << " algorithm=" << algorithm
+          << " threads=" << threads
+          << " block_size=" << block_size
           << " time=" << total_time
           << " epochs=" << total_epochs
           << " epoch_time=" << total_epoch_time
