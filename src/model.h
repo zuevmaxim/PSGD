@@ -34,9 +34,9 @@ private:
 };
 
 namespace svm {
-  static inline bool predict(const vector<fp_type>* w, const data_point& point) {
-      fp_type dot = vectors::dot(w->data, point.data, point.indices, point.size);
-      return dot > 0;
+  static inline bool check(const vector<fp_type>* w, const data_point& point) {
+      const fp_type dot = vectors::dot(w->data, point.data, point.indices, point.size);
+      return dot * point.label > static_cast<fp_type>(0.0);
   }
 
   static inline void update(const data_point& point, vector<fp_type>* w, const fp_type step, const SVMParams* args) {
@@ -61,7 +61,7 @@ namespace svm {
 }
 
 #define MODEL_UPDATE svm::update
-#define MODEL_PREDICT svm::predict
+#define MODEL_CHECK svm::check
 #define MODEL_PARAMS SVMParams
 
 static fp_type compute_accuracy(const dataset_local& dataset, const vector<fp_type>* w) {
@@ -69,9 +69,7 @@ static fp_type compute_accuracy(const dataset_local& dataset, const vector<fp_ty
     uint correct = 0;
     FOR_N(i, size) {
         const data_point point = dataset[i];
-        bool predicted = MODEL_PREDICT(w, point);
-        bool expected = point.label > 0;
-        correct += (predicted == expected) ? 1 : 0;
+        correct += MODEL_CHECK(w, point);
     }
     return static_cast<fp_type>(correct) / size;
 }
