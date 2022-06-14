@@ -10,6 +10,7 @@
 #include "numa.h"
 #include "cpu_config.h"
 #include <algorithm>
+#include <random>
 
 const uint SIZE_UINT = sizeof(uint);
 const uint SIZE_FP_TYPE = sizeof(fp_type);
@@ -46,10 +47,11 @@ std::vector <tmp_point> load_dataset_from_file(const std::string& name) {
         ss >> x;
         p.label = (x == 1.0) ? 1.0 : -1.0;
         while (ss >> index >> c >> x) {
-            if (c != ':' || index < 0) {
+            if (c != ':' || index < 1) {
                 std::cerr << "Warning! error while reading dataset, split symbol is " << c << " index=" << index << name << std::endl;
                 continue;
             }
+            index -= 1;
             p.indices.push_back(index);
             p.data.push_back(x);
         }
@@ -73,7 +75,9 @@ class dataset_local {
       FOR_N(i, _size) {
           p[i] = i;
       }
-      std::random_shuffle(p.begin(), p.end());
+      std::random_device rd;
+      std::mt19937 g(rd());
+      std::shuffle(p.begin(), p.end(), g);
 
       data_buffer_size = 0;
       data_buffer_size += SIZE_CHAR_PTR * _size; // pointers to points
