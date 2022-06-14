@@ -134,7 +134,7 @@ void* thread_task(void* args, const uint thread_id) {
         uint expected_epoch = e;
         if (task.validator->compare_exchange_strong(expected_epoch, expected_epoch + 1)) {
             const fp_type accuracy = compute_accuracy(validate, w);
-            if (accuracy > task.params.target_accuracy) {
+            if (accuracy >= task.params.target_accuracy) {
                 task.stop->store(true);
                 epochs = e + 1;
                 break;
