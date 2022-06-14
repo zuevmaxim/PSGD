@@ -36,7 +36,7 @@ private:
 namespace svm {
   static inline bool check(const vector<fp_type>* w, const data_point& point) {
       const fp_type dot = vectors::dot(w->data, point.data, point.indices, point.size);
-      return dot * point.label > static_cast<fp_type>(0.0);
+      return std::max(dot * point.label, 0.0) != 0;
   }
 
   static inline void update(const data_point& point, vector<fp_type>* w, const fp_type step, const SVMParams* args) {
