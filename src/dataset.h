@@ -25,8 +25,18 @@ struct tmp_point {
 struct data_point {
   uint size;
   fp_type label;
-  const uint* indices;
-  const fp_type* data;
+  char* data;
+
+  inline void get(uint i, uint* index, fp_type*value) const {
+      const uint offset = (SIZE_UINT + SIZE_FP_TYPE) * i;
+      *index = *reinterpret_cast<uint*>(data + offset);
+      *value = *reinterpret_cast<fp_type*>(data + offset + SIZE_UINT);
+  }
+
+  inline uint get_index(uint i) const {
+      const uint offset = (SIZE_UINT + SIZE_FP_TYPE) * i;
+      return *reinterpret_cast<uint*>(data + offset);
+  }
 };
 
 std::vector <tmp_point> load_dataset_from_file(const std::string& name) {
@@ -106,8 +116,6 @@ class dataset_local {
               if (_features < index) _features = index;
               *reinterpret_cast<uint*>(buffer) = index;
               buffer += SIZE_UINT;
-          }
-          FOR_N(i, size) {
               *reinterpret_cast<fp_type*>(buffer) = point.data[i];
               buffer += SIZE_FP_TYPE;
           }
@@ -134,15 +142,12 @@ public:
 
   inline data_point operator[](const uint index) const {
       data_point point;
-      const char* buffer = points_ptr[index];
-      const uint point_size = *reinterpret_cast<const uint*>(buffer);
-      point.size = point_size;
+      char* buffer = points_ptr[index];
+      point.size = *reinterpret_cast<const uint*>(buffer);
       buffer += SIZE_UINT;
       point.label = *reinterpret_cast<const fp_type*>(buffer);
       buffer += SIZE_FP_TYPE;
-      point.indices = reinterpret_cast<const uint*>(buffer);
-      buffer += SIZE_UINT * point_size;
-      point.data = reinterpret_cast<const fp_type*>(buffer);
+      point.data = buffer;
       return point;
   }
 

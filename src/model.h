@@ -26,34 +26,58 @@ private:
       FOR_N(i, size) {
           const data_point point = points[i];
           FOR_N(j, point.size) {
-              degrees[point.indices[j]]++;
+              degrees[point.get_index(j)]++;
           }
       }
       return degrees;
   }
 };
 
+namespace vectors {
+  inline fp_type dot(const fp_type* const __restrict__ a_data,
+                     const data_point& point) {
+      fp_type result = 0;
+      FOR_N_REV(i, point.size) {
+          uint index;
+          fp_type b_val;
+          point.get(i, &index, &b_val);
+          const fp_type a_val = a_data[index];
+          result += a_val * b_val;
+      }
+      return result;
+  }
+
+  inline void scale_and_add(fp_type* const __restrict__ a_data,
+                            const data_point& point,
+                            const fp_type s) {
+      FOR_N_REV(i, point.size) {
+          uint index;
+          fp_type b_val;
+          point.get(i, &index, &b_val);
+          a_data[index] += s * b_val;
+      }
+  }
+}
+
 namespace svm {
   static inline bool check(const vector<fp_type>* w, const data_point& point) {
-      const fp_type dot = vectors::dot(w->data, point.data, point.indices, point.size);
+      const fp_type dot = vectors::dot(w->data, point);
       return std::max(dot * point.label, 0.0) != 0;
   }
 
   static inline void update(const data_point& point, vector<fp_type>* w, const fp_type step, const SVMParams* args) {
-      const uint size = point.size;
-      const uint* const __restrict__ indices = point.indices;
       fp_type* const __restrict__ vals = w->data;
-      const fp_type wxy = vectors::dot(vals, point.data, indices, size) * point.label;
+      const fp_type wxy = vectors::dot(vals, point) * point.label;
 
       if (wxy < 1) { // hinge is active.
           const fp_type e = step * point.label;
-          vectors::scale_and_add(vals, point.data, indices, size, e);
+          vectors::scale_and_add(vals, point, e);
       }
 
       const uint* const __restrict__ degrees = args->degrees.data;
       const fp_type scalar = step * args->mu;
-      FOR_N(i, size) {
-          const int j = indices[i];
+      FOR_N_REV(i, point.size) {
+          const int j = point.get_index(i);
           const unsigned deg = degrees[j];
           vals[j] *= 1 - scalar / deg;
       }
@@ -64,13 +88,18 @@ namespace svm {
 #define MODEL_CHECK svm::check
 #define MODEL_PARAMS SVMParams
 
-static fp_type compute_accuracy(const dataset_local& dataset, const vector<fp_type>* w) {
-    const uint size = dataset.get_size();
+static uint compute_correct(const dataset_local& dataset, const vector<fp_type>* w, const uint start, const uint end) {
     uint correct = 0;
-    FOR_N(i, size) {
+    for (uint i = start; i < end; ++i) {
         const data_point point = dataset[i];
         correct += MODEL_CHECK(w, point);
     }
+    return correct;
+}
+
+static fp_type compute_accuracy(const dataset_local& dataset, const vector<fp_type>* w) {
+    const uint size = dataset.get_size();
+    const uint correct = compute_correct(dataset, w, 0, size);
     return static_cast<fp_type>(correct) / size;
 }
 
