@@ -56,6 +56,7 @@ struct experiment_configuration {
                 << " step_size=" << step_size
                 << " step_decay=" << step_decay
                 << (algorithm == "HogWild" ? "" : " update_delay=" + std::to_string(update_delay))
+                << " block_size=" << block_size
                 << std::endl;
 
       thread_pool tp(threads);
@@ -74,6 +75,7 @@ struct experiment_configuration {
       fp_type total_time = 0;
       fp_type total_epochs = 0;
       fp_type total_epoch_time = 0;
+      fp_type total_tests = 0;
 
       FOR_N(run, test_repeats) {
           std::unique_ptr <T> scheme(create_scheme<T>(features, &svm_params));
@@ -100,9 +102,6 @@ struct experiment_configuration {
           std::cout << std::fixed << std::setprecision(5) << std::setfill(' ')
                     << "Experiment " << run + 1 << "/" << test_repeats
                     << " completed with " << (success ? "SUCCESS" : "FAIL")
-                    << " train=" << train_accuracy
-                    << " validate=" << validate_accuracy
-                    << " test=" << test_accuracy
                     << " time=" << time
                     << " epochs=" << average_epochs
                     << " per_epoch=" << epoch_time
@@ -117,28 +116,30 @@ struct experiment_configuration {
               << std::endl;
 
           if (!success) {
-              std::cerr << "Break experiments!" << std::endl;
-              break;
+              continue;
           }
 
           total_time += time;
           total_epochs += average_epochs;
           total_epoch_time += epoch_time;
+          total_tests++;
       }
-      if (success) {
-          total_time /= test_repeats;
-          total_epochs /= test_repeats;
-          total_epoch_time /= test_repeats;
 
-          std::cout << "\nAverage results:"
-          << " algorithm=" << algorithm
-          << " threads=" << threads
-          << " block_size=" << block_size
-          << " time=" << total_time
-          << " epochs=" << total_epochs
-          << " epoch_time=" << total_epoch_time
-          << std::endl;
-      }
+      total_time /= total_tests;
+      total_epochs /= total_tests;
+      total_epoch_time /= total_tests;
+      total_tests /= test_repeats;
+
+
+      std::cout << "\nAverage results:"
+                << " algorithm=" << algorithm
+                << " threads=" << threads
+                << " block_size=" << block_size
+                << " convergence=" << total_tests
+                << " time=" << total_time
+                << " epochs=" << total_epochs
+                << " epoch_time=" << total_epoch_time
+                << std::endl;
   }
 
   void run_experiments() {
