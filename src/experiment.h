@@ -11,6 +11,7 @@
 #include "blok_permutation.h"
 #include "cpu_config.h"
 #include <atomic>
+#include "spin_barrier.h"
 
 
 struct sgd_params {
@@ -29,8 +30,8 @@ public:
   const dataset& train;
   const dataset& validate;
   const uint threads;
-  std::atomic<uint>* const validator;
-  std::atomic<bool>* const stop;
+  spin_barrier* const barrier;
+  std::atomic<uint>* const stop;
   permutation* perm;
   const bool copy;
   uint blocks_per_thread;
@@ -47,8 +48,8 @@ public:
         train(train),
         validate(validate),
         threads(threads),
-        validator(new std::atomic<uint>(0)),
-        stop(new std::atomic<bool>(false)),
+        barrier(new spin_barrier(threads)),
+        stop(new std::atomic<uint>(0)),
         copy(false) {
       const uint data_size = train.get_data(0).get_size();
       blocks_per_thread = std::max(1u, data_size / (params->block_size * threads));
@@ -63,7 +64,7 @@ public:
         train(other.train),
         validate(other.validate),
         threads(other.threads),
-        validator(other.validator),
+        barrier(other.barrier),
         stop(other.stop),
         perm(other.perm),
         copy(true),
@@ -72,7 +73,7 @@ public:
   ~Task() {
       delete data_scheme;
       if (copy) return;
-      delete validator;
+      delete barrier;
       delete stop;
       delete perm;
   }
@@ -97,6 +98,12 @@ void* thread_task(void* args, const uint thread_id) {
     const uint blocks_per_cluster = blocks_per_thread * threads_per_cluster;
     const uint cluster_id = thread_id / threads_per_cluster;
     const uint in_cluster_id = thread_id % threads_per_cluster;
+
+    const uint valid_size = validate.get_size();
+    const uint valid_block_size = valid_size / task.threads;
+    const uint valid_start = valid_block_size * thread_id;
+    const uint valid_end = thread_id + 1 == task.threads ? valid_size : valid_block_size * (thread_id + 1);
+    const uint target_correct = task.params.target_accuracy * valid_size;
 
     vector<uint> blocks_perm;
     blocks_perm.init(blocks_per_thread);
@@ -126,22 +133,18 @@ void* thread_task(void* args, const uint thread_id) {
         }
         task.params.step *= task.params.step_decay;
 
+        perm_n = perm_n->gen_next();
+        cluster_perm = cluster_perm->gen_next();
 
-        if (task.stop->load()) {
+        task.stop->store(0);
+        task.barrier->wait();
+        const uint correct = compute_correct(validate, w, valid_start, valid_end);
+        task.stop->fetch_add(correct);
+        task.barrier->wait();
+        if (task.stop->load() >= target_correct) {
             epochs = e + 1;
             break;
         }
-        uint expected_epoch = e;
-        if (task.validator->compare_exchange_strong(expected_epoch, expected_epoch + 1)) {
-            const fp_type accuracy = compute_accuracy(validate, w);
-            if (accuracy >= task.params.target_accuracy) {
-                task.stop->store(true);
-                epochs = e + 1;
-                break;
-            }
-        }
-        perm_n = perm_n->gen_next();
-        cluster_perm = cluster_perm->gen_next();
         perm_node::shuffle(blocks_perm.data, blocks_per_thread);
     }
     return new uint(epochs);
