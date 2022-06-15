@@ -61,28 +61,14 @@ public:
 
 class permutation {
   perm_node* cluster_permutation;
-  std::vector<perm_node*> roots;
 
 public:
-  permutation(uint nodes, uint perm_size, uint clusters) {
+  permutation(uint clusters) {
       cluster_permutation = new perm_node(clusters);
-      roots.resize(nodes);
-      FOR_N(node, nodes) {
-          RUN_NUMA_START(node)
-              roots[node] = new perm_node(perm_size);
-          RUN_NUMA_END
-      }
   }
 
   ~permutation() {
       delete cluster_permutation;
-      FOR_N(i, roots.size()) {
-          delete roots[i];
-      }
-  }
-
-  perm_node* get_basic_permutation(uint node) {
-      return roots[node];
   }
 
   perm_node* get_cluster_permutation() {

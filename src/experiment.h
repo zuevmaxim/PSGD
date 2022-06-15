@@ -31,10 +31,10 @@ public:
   const dataset& validate;
   const uint threads;
   spin_barrier* const barrier;
-  std::atomic<uint>* const stop;
-  permutation* perm;
+  std::atomic <uint>* const stop;
+  permutation* const perm;
   const bool copy;
-  uint blocks_per_thread;
+  const uint blocks_per_thread;
 
 
   Task(uint nodes,
@@ -50,13 +50,9 @@ public:
         threads(threads),
         barrier(new spin_barrier(threads)),
         stop(new std::atomic<uint>(0)),
-        copy(false) {
-      const uint data_size = train.get_data(0).get_size();
-      blocks_per_thread = std::max(1u, data_size / (params->block_size * threads));
-      const uint total_blocks = threads * blocks_per_thread;
-      const uint actual_block_size = data_size / total_blocks;
-      perm = new permutation(nodes,actual_block_size, data_scheme->number_of_copies());
-  }
+        perm(new permutation(nodes)),
+        copy(false),
+        blocks_per_thread(std::max(1u, train.get_data(0).get_size() / (params->block_size * threads))) {}
 
   Task(const Task& other)
       : params(other.params),
@@ -91,10 +87,11 @@ void* thread_task(void* args, const uint thread_id) {
     MODEL_PARAMS* const model_args = reinterpret_cast<MODEL_PARAMS*>(scheme->get_model_args(thread_id));
 
     perm_node* cluster_perm = task.perm->get_cluster_permutation();
-    perm_node* perm_n = task.perm->get_basic_permutation(node);
-    const uint block_size = perm_n->size;
     const uint threads_per_cluster = task.threads / cluster_perm->size;
     const uint blocks_per_thread = task.blocks_per_thread;
+    const uint total_blocks = blocks_per_thread * task.threads;
+    const uint train_size = train.get_size();
+    const uint block_size = train_size / total_blocks;
     const uint blocks_per_cluster = blocks_per_thread * threads_per_cluster;
     const uint cluster_id = thread_id / threads_per_cluster;
     const uint in_cluster_id = thread_id % threads_per_cluster;
@@ -115,25 +112,22 @@ void* thread_task(void* args, const uint thread_id) {
     uint epochs = n;
     FOR_N(e, n) {
         const fp_type step = task.params.step;
-        const uint* const perm_array = perm_n->permutation;
         const uint c = cluster_perm->permutation[cluster_id];
         const uint start_block = c * blocks_per_cluster + in_cluster_id * blocks_per_thread;
 
         FOR_N(block_index, blocks_per_thread) {
             const uint block = blocks_perm[block_index] + start_block;
             const uint start = block_size * block;
+            const uint end = block == total_blocks ? train_size : start + block_size;
 
             // Update cycle must avoid any unnecessary NUMA communication
-            FOR_N(i, block_size) {
-                const uint index = perm_array[i] + start;
-                const data_point point = train[index];
+            for (uint i = start; i < end; ++i) {
+                const data_point point = train[i];
                 MODEL_UPDATE(point, w, step, model_args);
                 scheme->post_update(thread_id, step);
             }
         }
         task.params.step *= task.params.step_decay;
-
-        perm_n = perm_n->gen_next();
         cluster_perm = cluster_perm->gen_next();
 
         task.stop->store(0);
