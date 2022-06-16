@@ -8,7 +8,7 @@
 #include "model.h"
 #include "dataset.h"
 #include "thread_pool.h"
-#include "blok_permutation.h"
+#include "block_permutation.h"
 #include "cpu_config.h"
 #include <atomic>
 #include "spin_barrier.h"

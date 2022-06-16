@@ -2,8 +2,8 @@
 // Created by Maksim.Zuev on 29.05.2022.
 //
 
-#ifndef PSGD_BLOK_PERMUTATION_H
-#define PSGD_BLOK_PERMUTATION_H
+#ifndef PSGD_BLOCK_PERMUTATION_H
+#define PSGD_BLOCK_PERMUTATION_H
 
 #include "types.h"
 #include <vector>
@@ -77,4 +77,4 @@ public:
 };
 
 
-#endif //PSGD_BLOK_PERMUTATION_H
+#endif //PSGD_BLOCK_PERMUTATION_H
