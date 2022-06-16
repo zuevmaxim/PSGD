@@ -3,3 +3,4 @@
 /src/numa.h
 /bin/*
 /.idea
+/analysis/.idea
