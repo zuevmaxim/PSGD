@@ -159,11 +159,16 @@ public:
           thread_to_model[thread_id] = model;
       }
 
-      next.init(size);
-      FOR_N(thread_id, params.threads) {
-          next[thread_id] = params.cluster_count > 1 && thread_id < params.phy_threads
-                            ? (thread_id + params.cluster_size) % params.phy_threads
-                            : -1;
+      next.init(size, -1);
+      if (params.cluster_count > 1) {
+          FOR_N(thread_id, params.phy_threads) {
+              const uint next_candidate = thread_id + params.cluster_size;
+              if (next_candidate < params.phy_threads) {
+                  next[thread_id] = next_candidate;
+              } else {
+                  next[thread_id] = (thread_id + 1) % params.cluster_size;
+              }
+          }
       }
   }
 
@@ -306,11 +311,16 @@ public:
           thread_to_model[thread_id] = model;
       }
 
-      next.init(size);
-      FOR_N(thread_id, params.threads) {
-          next[thread_id] = params.cluster_count > 1 && thread_id < params.phy_threads
-                            ? (thread_id + params.cluster_size) % params.phy_threads
-                            : -1;
+      next.init(size, -1);
+      if (params.cluster_count > 1) {
+          FOR_N(thread_id, params.phy_threads) {
+              const uint next_candidate = thread_id + params.cluster_size;
+              if (next_candidate < params.phy_threads) {
+                  next[thread_id] = next_candidate;
+              } else {
+                  next[thread_id] = (thread_id + 1) % params.cluster_size;
+              }
+          }
       }
   }
 
