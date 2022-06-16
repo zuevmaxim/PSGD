@@ -40,15 +40,15 @@ public:
   }
 
 
-  void* get_model_args(uint thread_id) {
+  void* get_model_args(uint) {
       return args;
   }
 
-  vector<fp_type>* get_model_vector(uint thread_id) {
+  vector<fp_type>* get_model_vector(uint) {
       return w;
   }
 
-  inline void post_update(uint thread_id, fp_type step) {}
+  inline void post_update(uint, fp_type) {}
 
   hogwild_data_scheme* clone() {
       return new hogwild_data_scheme(*this);
@@ -87,7 +87,7 @@ private:
       fp_type start = 0.6;
       fp_type end = 1.0;
       fp_type mid = 0.5;
-      fp_type err = 0;
+      fp_type err;
       if (n >= 2) {
           do {
               mid = (start + end) / 2;
@@ -345,7 +345,7 @@ public:
       return new mywild_data_scheme(*this);
   }
 
-  inline void post_update(uint thread_id, const fp_type step) {
+  inline void post_update(uint thread_id, const fp_type) {
       if (--delay > 0) return;
       if (thread_id != *sync_thread) return;
       sync_with_next(thread_id);

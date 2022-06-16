@@ -43,7 +43,7 @@ struct experiment_configuration {
   }
 
   template<typename T>
-  T* create_scheme(uint features, void* model_args) {
+  T* create_scheme(uint, void*) {
       throw std::runtime_error("This function must not be called!");
   }
 
