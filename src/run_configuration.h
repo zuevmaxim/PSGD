@@ -35,8 +35,6 @@ struct experiment_configuration {
 
   bool from_string(const std::string& command) {
       std::stringstream ss(command);
-
-      // HogWild 10 1 1 100 128 0.97713 0.5 0.8 512
       ss >> algorithm >> test_repeats >> threads >> cluster_size >> max_epochs >> update_delay >> target_accuracy
          >> step_size >> step_decay >> block_size;
       return !ss.fail();
