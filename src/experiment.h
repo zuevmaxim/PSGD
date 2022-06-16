@@ -67,8 +67,10 @@ public:
         blocks_per_thread(other.blocks_per_thread) {}
 
   ~Task() {
-      delete data_scheme;
-      if (copy) return;
+      if (copy) {
+          delete data_scheme;
+          return;
+      }
       delete barrier;
       delete stop;
       delete perm;
