@@ -120,7 +120,7 @@ void* thread_task(void* args, const uint thread_id) {
         FOR_N(block_index, blocks_per_thread) {
             const uint block = blocks_perm[block_index] + start_block;
             const uint start = block_size * block;
-            const uint end = block + 1 == total_blocks ? train_size : start + block_size;
+            const uint end = unlikely(block + 1 == total_blocks) ? train_size : start + block_size;
 
             // Update cycle must avoid any unnecessary NUMA communication
             for (uint i = start; i < end; ++i) {
@@ -135,7 +135,7 @@ void* thread_task(void* args, const uint thread_id) {
         const uint correct = compute_correct(validate, w, valid_start, valid_end);
         task.correct->fetch_add(correct);
         task.barrier->wait();
-        if (task.correct->load() >= target_correct) {
+        if (unlikely(task.correct->load() >= target_correct)) {
             epochs = e + 1;
             break;
         }

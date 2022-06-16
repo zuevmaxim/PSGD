@@ -195,7 +195,7 @@ public:
   }
 
   inline void post_update(uint thread_id, const fp_type step) {
-      if (--delay > 0) return;
+      if (likely(--delay > 0)) return;
       if (thread_id != *sync_thread) return;
       sync_with_next(thread_id, step);
   }
@@ -346,7 +346,7 @@ public:
   }
 
   inline void post_update(uint thread_id, const fp_type) {
-      if (--delay > 0) return;
+      if (likely(--delay > 0)) return;
       if (thread_id != *sync_thread) return;
       sync_with_next(thread_id);
   }
