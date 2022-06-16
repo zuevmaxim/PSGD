@@ -17,7 +17,7 @@ clean:
 	rm -rf bin/*
 
 
-datasets: dirs data/rcv1 data/rcv1.t
+datasets: dirs data/rcv1 data/rcv1.t data/news20
 data/rcv1.t:
 	wget https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/rcv1_train.binary.bz2
 	bunzip2 rcv1_train.binary.bz2
@@ -30,3 +30,8 @@ data/rcv1:
 	wget https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/rcv1_test.binary.bz2
 	bunzip2 rcv1_test.binary.bz2
 	mv rcv1_test.binary data/rcv1
+
+data/news20:
+	wget https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/news20.binary.bz2
+	bunzip2 news20.binary.bz2
+	python3 test_train_split.py 0.8 news20.binary data/news20 data/news20.t && rm news20.binary
