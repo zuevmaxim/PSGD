@@ -44,7 +44,7 @@ public:
        const dataset& validate,
        uint threads)
       : params(*params),
-        data_scheme(data_scheme->clone()),
+        data_scheme(data_scheme),
         train(train),
         validate(validate),
         threads(threads),

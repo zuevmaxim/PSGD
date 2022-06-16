@@ -16,7 +16,7 @@
 // class abstract_data_scheme {
 //   virtual void* get_model_args(uint thread_id) = 0;
 //   virtual vector<fp_type>* get_model_vector(uint thread_id) = 0;
-//   virtual void post_update(uint thread_id, fp_type step) = 0;
+//   virtual inline void post_update(uint thread_id, fp_type step) = 0;
 //   virtual abstract_data_scheme* clone() = 0;
 //   virtual uint number_of_copies() const = 0;
 // };
@@ -48,7 +48,7 @@ public:
       return w;
   }
 
-  void post_update(uint thread_id, fp_type step) {}
+  inline void post_update(uint thread_id, fp_type step) {}
 
   hogwild_data_scheme* clone() {
       return new hogwild_data_scheme(*this);
@@ -170,7 +170,7 @@ public:
   ~hogwild_XX_data_scheme() {
       if (copy) return;
       delete sync_thread;
-      FOR_N(cluster, model_params.size) {
+      FOR_N(cluster, params.cluster_count) {
           delete model_params[cluster];
           delete w[cluster];
           delete old_w[cluster];
@@ -189,12 +189,15 @@ public:
       return new hogwild_XX_data_scheme(*this);
   }
 
-  void post_update(uint thread_id, const fp_type step) {
+  inline void post_update(uint thread_id, const fp_type step) {
       if (--delay > 0) return;
+      if (thread_id != *sync_thread) return;
+      sync_with_next(thread_id, step);
+  }
 
+  void sync_with_next(uint thread_id, const fp_type step) {
       const int next_id = next[thread_id];
       if (next_id < 0) return;
-      if (thread_id != *sync_thread) return;
 
       const uint model = thread_to_model[thread_id];
       const uint next_model = thread_to_model[next_id];
@@ -314,7 +317,7 @@ public:
   ~mywild_data_scheme() {
       if (copy) return;
       delete sync_thread;
-      FOR_N(cluster, model_params.size) {
+      FOR_N(cluster, params.cluster_count) {
           delete model_params[cluster];
           delete w[cluster];
       }
@@ -332,12 +335,15 @@ public:
       return new mywild_data_scheme(*this);
   }
 
-  void post_update(uint thread_id, const fp_type step) {
+  inline void post_update(uint thread_id, const fp_type step) {
       if (--delay > 0) return;
+      if (thread_id != *sync_thread) return;
+      sync_with_next(thread_id);
+  }
 
+  void sync_with_next(uint thread_id) {
       const int next_id = next[thread_id];
       if (next_id < 0) return;
-      if (thread_id != *sync_thread) return;
 
       const uint model = thread_to_model[thread_id];
       const uint next_model = thread_to_model[next_id];
