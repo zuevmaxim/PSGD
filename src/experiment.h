@@ -31,7 +31,7 @@ public:
   const dataset& validate;
   const uint threads;
   spin_barrier* const barrier;
-  std::atomic <uint>* const stop;
+  std::atomic <uint>* const correct;
   permutation* const perm;
   const bool copy;
   const uint blocks_per_thread;
@@ -49,7 +49,7 @@ public:
         validate(validate),
         threads(threads),
         barrier(new spin_barrier(threads)),
-        stop(new std::atomic<uint>(0)),
+        correct(new std::atomic<uint>(0)),
         perm(new permutation(nodes)),
         copy(false),
         blocks_per_thread(std::max(1u, train.get_data(0).get_size() / (params->block_size * threads))) {}
@@ -61,7 +61,7 @@ public:
         validate(other.validate),
         threads(other.threads),
         barrier(other.barrier),
-        stop(other.stop),
+        correct(other.correct),
         perm(other.perm),
         copy(true),
         blocks_per_thread(other.blocks_per_thread) {}
@@ -72,7 +72,7 @@ public:
           return;
       }
       delete barrier;
-      delete stop;
+      delete correct;
       delete perm;
   }
 };
@@ -132,15 +132,14 @@ void* thread_task(void* args, const uint thread_id) {
         task.params.step *= task.params.step_decay;
         cluster_perm = cluster_perm->gen_next();
 
-        task.stop->store(0);
-        task.barrier->wait();
         const uint correct = compute_correct(validate, w, valid_start, valid_end);
-        task.stop->fetch_add(correct);
+        task.correct->fetch_add(correct);
         task.barrier->wait();
-        if (task.stop->load() >= target_correct) {
+        if (task.correct->load() >= target_correct) {
             epochs = e + 1;
             break;
         }
+        task.correct->fetch_sub(correct);
         perm_node::shuffle(blocks_perm.data, blocks_per_thread);
     }
     return new uint(epochs);
@@ -159,7 +158,7 @@ bool run_experiment(
 
     results = tp.execute(thread_task<T>, &task);
 
-    return *task.stop;
+    return task.correct->load() > 0;
 }
 
 
