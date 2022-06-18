@@ -25,8 +25,9 @@ private:
       const uint size = points.get_size();
       FOR_N(i, size) {
           const data_point point = points[i];
+          const char* data = point.data;
           FOR_N(j, point.size) {
-              degrees[point.get_index(j)]++;
+              degrees[data_point::get_next_index(data)]++;
           }
       }
       return degrees;
@@ -37,10 +38,12 @@ namespace vectors {
   inline fp_type dot(const fp_type* const __restrict__ a_data,
                      const data_point& point) {
       fp_type result = 0;
-      FOR_N_REV(i, point.size) {
+      const uint size = point.size;
+      const char* data = point.data;
+      FOR_N(i, size) {
           uint index;
           fp_type b_val;
-          point.get(i, &index, &b_val);
+          data_point::get_next(data, &index, &b_val);
           const fp_type a_val = a_data[index];
           result += a_val * b_val;
       }
@@ -50,10 +53,12 @@ namespace vectors {
   inline void scale_and_add(fp_type* const __restrict__ a_data,
                             const data_point& point,
                             const fp_type s) {
-      FOR_N_REV(i, point.size) {
+      const uint size = point.size;
+      const char* data = point.data;
+      FOR_N(i, size) {
           uint index;
           fp_type b_val;
-          point.get(i, &index, &b_val);
+          data_point::get_next(data, &index, &b_val);
           a_data[index] += s * b_val;
       }
   }
@@ -76,9 +81,11 @@ namespace svm {
 
       const uint* const __restrict__ degrees = args->degrees.data;
       const fp_type scalar = step * args->mu;
-      FOR_N_REV(i, point.size) {
-          const int j = point.get_index(i);
-          const unsigned deg = degrees[j];
+      const uint size = point.size;
+      const char* data = point.data;
+      FOR_N(i, size) {
+          const uint j = data_point::get_next_index(data);
+          const uint deg = degrees[j];
           vals[j] *= 1 - scalar / deg;
       }
   }

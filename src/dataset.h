@@ -25,17 +25,18 @@ struct tmp_point {
 struct data_point {
   uint size;
   fp_type label;
-  char* data;
+  const char* data;
 
-  inline void get(uint i, uint* index, fp_type*value) const {
-      const uint offset = (SIZE_UINT + SIZE_FP_TYPE) * i;
-      *index = *reinterpret_cast<uint*>(data + offset);
-      *value = *reinterpret_cast<fp_type*>(data + offset + SIZE_UINT);
+  inline static void get_next(const char*& data, uint* index, fp_type* value) {
+      *index = *reinterpret_cast<const uint*>(data);
+      *value = *reinterpret_cast<const fp_type*>(data + SIZE_UINT);
+      data += SIZE_UINT + SIZE_FP_TYPE;
   }
 
-  inline uint get_index(uint i) const {
-      const uint offset = (SIZE_UINT + SIZE_FP_TYPE) * i;
-      return *reinterpret_cast<uint*>(data + offset);
+  inline static uint get_next_index(const char*& data) {
+      const uint index = *reinterpret_cast<const uint*>(data);
+      data += SIZE_UINT + SIZE_FP_TYPE;
+      return index;
   }
 };
 
