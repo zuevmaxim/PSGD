@@ -14,7 +14,9 @@ datasets = [
     # "music",
     "rcv1",
     # "epsilon",
-    # "news20"
+    # "news20",
+    # "url",
+    # "kdda",
 ]
 stepdecay_trials_length = 1
 nthreads = [1, 2, 4, 8, 16]
@@ -28,7 +30,7 @@ max_iterations = {
     "HogWild++": {"default": 50, "epsilon": 25},
     "MyWild": {"default": 50, "epsilon": 25},
 }
-block_size = [512]
+block_size = [2048]
 maxstepsize = {
     "a8a": 5e-01,
     "covtype": 5e-03,
@@ -37,14 +39,18 @@ maxstepsize = {
     "rcv1": 5e-01,
     "epsilon": 1e-01,
     "news20": 5e-01,
+    "url": 5e-01,
+    "kdda": 5e-01,
 }
 target_accuracy = {
     "a8a": 0.845374,
     "covtype": 0.76291,
     "webspam": 0.92700,
-    "rcv1": 0.97713,
+    "rcv1": 0.978028,
     "epsilon": 0.89740,
     "news20": 0.96425,
+    "url": 0.99,
+    "kdda": 1,
 }
 stepdecay_per_dataset = {
     "a8a": 0.8,
@@ -54,6 +60,8 @@ stepdecay_per_dataset = {
     "rcv1": 0.8,
     "epsilon": 0.85,
     "news20": 0.8,
+    "url": 0.8,
+    "kdda": 0.8,
     "default": 0.5,
 }
 
