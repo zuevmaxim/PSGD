@@ -8,6 +8,7 @@
 #include "types.h"
 #include "dataset.h"
 #include "data_scheme.h"
+#include <atomic>
 
 
 struct SVMParams {
@@ -94,19 +95,68 @@ namespace svm {
 #define MODEL_CHECK svm::check
 #define MODEL_PARAMS SVMParams
 
-static uint compute_correct(const dataset_local& dataset, const vector<fp_type>* w, const uint start, const uint end) {
-    uint correct = 0;
+struct metric_summary {
+  std::atomic <uint> true_positive;
+  std::atomic <uint> true_negative;
+  std::atomic <uint> false_positive;
+  std::atomic <uint> false_negative;
+
+  metric_summary() : true_positive(0), true_negative(0), false_positive(0), false_negative(0) {}
+
+  metric_summary(uint tp, uint tn, uint fp, uint fn) : true_positive(tp), true_negative(tn), false_positive(fp), false_negative(fn) {}
+
+  metric_summary(const metric_summary& other)
+      : true_positive(other.true_positive.load()),
+        true_negative(other.true_negative.load()),
+        false_positive(other.false_positive.load()),
+        false_negative(other.false_negative.load()) {}
+
+  fp_type to_score() const {
+      const uint tp = true_positive.load();
+      const fp_type precision = static_cast<fp_type>(tp) / (tp + false_positive.load());
+      const fp_type recall = static_cast<fp_type>(tp) / (tp + false_negative.load());
+      return 2 * precision * recall / (precision + recall);
+  }
+
+  metric_summary& operator+=(const metric_summary& x) {
+      true_positive.fetch_add(x.true_positive.load());
+      true_negative.fetch_add(x.true_negative.load());
+      false_positive.fetch_add(x.false_positive.load());
+      false_negative.fetch_add(x.false_negative.load());
+      return *this;
+  }
+
+  metric_summary& operator-=(const metric_summary& x) {
+      true_positive.fetch_sub(x.true_positive.load());
+      true_negative.fetch_sub(x.true_negative.load());
+      false_positive.fetch_sub(x.false_positive.load());
+      false_negative.fetch_sub(x.false_negative.load());
+      return *this;
+  }
+
+  uint total() const {
+      return true_positive.load() + true_negative.load() + false_positive.load() + false_negative.load();
+  }
+};
+
+static metric_summary compute_metric(const dataset_local& dataset, const vector<fp_type>* w, const uint start, const uint end) {
+    uint tp = 0, tn = 0, fp = 0, fn = 0;
     for (uint i = start; i < end; ++i) {
         const data_point point = dataset[i];
-        correct += MODEL_CHECK(w, point);
+        const bool correct = MODEL_CHECK(w, point);
+        const bool positive = point.label > 0;
+        if (correct) {
+            if (positive) tp++; else tn++;
+        } else {
+            if (positive) fn++; else fp++;
+        }
     }
-    return correct;
+    return {tp, tn, fp, fn};
 }
 
-static fp_type compute_accuracy(const dataset_local& dataset, const vector<fp_type>* w) {
+static metric_summary compute_metric(const dataset_local& dataset, const vector<fp_type>* w) {
     const uint size = dataset.get_size();
-    const uint correct = compute_correct(dataset, w, 0, size);
-    return static_cast<fp_type>(correct) / size;
+    return compute_metric(dataset, w, 0, size);
 }
 
 #endif //PSGD_MODEL_H

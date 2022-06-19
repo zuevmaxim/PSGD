@@ -16,7 +16,7 @@
 
 struct sgd_params {
   uint max_epochs;
-  fp_type target_accuracy;
+  fp_type target_score;
   fp_type step_decay;
   fp_type step;
   uint block_size;
@@ -31,7 +31,7 @@ public:
   const dataset& validate;
   const uint threads;
   spin_barrier* const barrier;
-  std::atomic <uint>* const correct;
+  metric_summary* const metric;
   permutation* const perm;
   const bool copy;
   const uint blocks_per_thread;
@@ -49,7 +49,7 @@ public:
         validate(validate),
         threads(threads),
         barrier(new spin_barrier(threads)),
-        correct(new std::atomic<uint>(0)),
+        metric(new metric_summary()),
         perm(new permutation(nodes)),
         copy(false),
         blocks_per_thread(std::max(1u, train.get_data(0).get_size() / (params->block_size * threads))) {}
@@ -61,7 +61,7 @@ public:
         validate(other.validate),
         threads(other.threads),
         barrier(other.barrier),
-        correct(other.correct),
+        metric(other.metric),
         perm(other.perm),
         copy(true),
         blocks_per_thread(other.blocks_per_thread) {}
@@ -72,7 +72,7 @@ public:
           return;
       }
       delete barrier;
-      delete correct;
+      delete metric;
       delete perm;
   }
 };
@@ -102,7 +102,7 @@ void* thread_task(void* args, const uint thread_id) {
     const uint valid_block_size = valid_size / task.threads;
     const uint valid_start = valid_block_size * thread_id;
     const uint valid_end = thread_id + 1 == task.threads ? valid_size : valid_block_size * (thread_id + 1);
-    const uint target_correct = task.params.target_accuracy * valid_size;
+    const fp_type target_score = task.params.target_score;
 
     vector<uint> blocks_perm;
     blocks_perm.init(blocks_per_thread);
@@ -132,14 +132,15 @@ void* thread_task(void* args, const uint thread_id) {
         task.params.step *= task.params.step_decay;
         cluster_perm = cluster_perm->gen_next();
 
-        const uint correct = compute_correct(validate, w, valid_start, valid_end);
-        task.correct->fetch_add(correct);
+        const auto summary = compute_metric(validate, w, valid_start, valid_end);
+        *task.metric += summary;
         task.barrier->wait();
-        if (unlikely(task.correct->load() >= target_correct)) {
+        const fp_type current_score = task.metric->to_score();
+        if (unlikely(current_score >= target_score)) {
             epochs = e + 1;
             break;
         }
-        task.correct->fetch_sub(correct);
+        *task.metric -= summary;
         perm_node::shuffle(blocks_perm.data, blocks_per_thread);
     }
     return new uint(epochs);
@@ -158,7 +159,7 @@ bool run_experiment(
 
     results = tp.execute(thread_task<T>, &task);
 
-    return task.correct->load() > 0;
+    return task.metric->total() > 0;
 }
 
 

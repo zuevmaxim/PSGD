@@ -25,7 +25,7 @@ struct experiment_configuration {
   unsigned test_repeats = 1;
   unsigned block_size = 512;
   unsigned threads = 1, cluster_size = 1, max_epochs = 100, update_delay = 64;
-  fp_type target_accuracy = 1, step_size = 0.5, step_decay = 0.8;
+  fp_type target_score = 1, step_size = 0.5, step_decay = 0.8;
   fp_type mu = 1, tolerance = 0.01;
 
   experiment_configuration(const dataset& train_dataset,
@@ -35,7 +35,7 @@ struct experiment_configuration {
 
   bool from_string(const std::string& command) {
       std::stringstream ss(command);
-      ss >> algorithm >> test_repeats >> threads >> cluster_size >> max_epochs >> update_delay >> target_accuracy
+      ss >> algorithm >> test_repeats >> threads >> cluster_size >> max_epochs >> update_delay >> target_score
          >> step_size >> step_decay >> block_size;
       return !ss.fail();
   }
@@ -50,7 +50,7 @@ struct experiment_configuration {
       std::cout << "Start experiments (" << test_repeats << ") with " << algorithm << " algorithm"
                 << " threads=" << threads
                 << (algorithm == "HogWild" ? "" : " cluster_size=" + std::to_string(cluster_size))
-                << " target_accuracy=" << target_accuracy
+                << " target_score=" << target_score
                 << " step_size=" << step_size
                 << " step_decay=" << step_decay
                 << (algorithm == "HogWild" ? "" : " update_delay=" + std::to_string(update_delay))
@@ -64,7 +64,7 @@ struct experiment_configuration {
 
       sgd_params params;
       params.max_epochs = max_epochs;
-      params.target_accuracy = target_accuracy;
+      params.target_score = target_score;
       params.step_decay = step_decay;
       params.step = step_size;
       params.block_size = block_size;
@@ -91,9 +91,9 @@ struct experiment_configuration {
           }
           fp_type average_epochs = static_cast<fp_type>(epochs) / threads;
 
-          fp_type train_accuracy = compute_accuracy(train_dataset.get_data(0), scheme->get_model_vector(0));
-          fp_type validate_accuracy = compute_accuracy(validate_dataset.get_data(0), scheme->get_model_vector(0));
-          fp_type test_accuracy = compute_accuracy(test_dataset.get_data(0), scheme->get_model_vector(0));
+          fp_type train_score = compute_metric(train_dataset.get_data(0), scheme->get_model_vector(0)).to_score();
+          fp_type validate_score = compute_metric(validate_dataset.get_data(0), scheme->get_model_vector(0)).to_score();
+          fp_type test_score = compute_metric(test_dataset.get_data(0), scheme->get_model_vector(0)).to_score();
           fp_type time = static_cast<fp_sec>(end - start).count();
           fp_type epoch_time = time / average_epochs;
 
@@ -107,10 +107,10 @@ struct experiment_configuration {
 
           output
               << algorithm << ',' << threads << ',' << cluster_size << ',' << (success ? 1 : 0) << ','
-              << time << ',' << train_accuracy << ',' << validate_accuracy << ',' << test_accuracy << ','
+              << time << ',' << train_score << ',' << validate_score << ',' << test_score << ','
               << average_epochs << ',' << epoch_time << ','
               << step_size << ',' << step_decay << ',' << update_delay << ','
-              << target_accuracy << ',' << block_size
+              << target_score << ',' << block_size
               << std::endl;
 
           if (!success) {
