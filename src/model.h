@@ -118,20 +118,18 @@ struct metric_summary {
       return 2 * precision * recall / (precision + recall);
   }
 
-  metric_summary& operator+=(const metric_summary& x) {
+  void plus(const metric_summary& x) {
       true_positive.fetch_add(x.true_positive.load());
       true_negative.fetch_add(x.true_negative.load());
       false_positive.fetch_add(x.false_positive.load());
       false_negative.fetch_add(x.false_negative.load());
-      return *this;
   }
 
-  metric_summary& operator-=(const metric_summary& x) {
-      true_positive.fetch_sub(x.true_positive.load());
-      true_negative.fetch_sub(x.true_negative.load());
-      false_positive.fetch_sub(x.false_positive.load());
-      false_negative.fetch_sub(x.false_negative.load());
-      return *this;
+  void zero() {
+      true_positive.store(0);
+      true_negative.store(0);
+      false_positive.store(0);
+      false_negative.store(0);
   }
 
   uint total() const {
