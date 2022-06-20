@@ -14,16 +14,16 @@
 
 class perm_node {
   std::atomic<perm_node*> next;
-  
+
   static const uint* generate_permutation(uint size) {
-      uint* permutation = new uint[size];
+      uint* const permutation = new uint[size];
       FOR_N(i, size) {
           permutation[i] = i;
       }
       shuffle(permutation, size);
       return permutation;
   }
-  
+
 public:
   const uint size;
   const uint* const permutation;
@@ -33,7 +33,7 @@ public:
   ~perm_node() {
       perm_node* next_node = next.load();
       if (next_node != NULL) delete next_node;
-      delete permutation;
+      delete[] permutation;
   }
 
   perm_node* gen_next() {

@@ -33,6 +33,7 @@ public:
   }
 
   void bind_to_cpu(unsigned thread_id) {
+      assert(0 <= thread_id && thread_id < cpus);
       int cpu = thread_core_mapping[thread_id];
       struct bitmask* cpu_mask;
       cpu_mask = numa_allocate_cpumask();
@@ -50,6 +51,7 @@ public:
   }
 
   unsigned get_node_for_thread(unsigned thread_id) const {
+      assert(0 <= thread_id && thread_id < cpus);
       return thread_node_mapping[thread_id];
   }
 
