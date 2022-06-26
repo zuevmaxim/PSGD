@@ -22,21 +22,22 @@ struct thread_data {
 
 typedef void* tp_task_return_t;
 typedef void* tp_task_internal_args_t;
-typedef tp_task_return_t(* tp_task_t)(tp_task_internal_args_t, unsigned) ;
+
+typedef tp_task_return_t(* tp_task_t)(tp_task_internal_args_t, unsigned);
 
 class thread_pool {
 private:
   const uint size;
   uint max_numa_node;
-  std::vector <pthread_t> threads;
-  std::vector <thread_data> thread_datas;
-  std::vector <tp_task_return_t> results;
+  std::vector<pthread_t> threads;
+  std::vector<thread_data> thread_datas;
+  std::vector<tp_task_return_t> results;
   std::atomic<bool> stop;
   barrier_t ready;
   barrier_t finished;
 
-  std::atomic <tp_task_t> task;
-  std::atomic <tp_task_internal_args_t> args;
+  std::atomic<tp_task_t> task;
+  std::atomic<tp_task_internal_args_t> args;
 
 
   void thread_loop(uint thread_id) {

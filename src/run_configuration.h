@@ -13,7 +13,7 @@
 
 
 typedef std::chrono::high_resolution_clock Time;
-typedef std::chrono::duration <fp_type> fp_sec;
+typedef std::chrono::duration<fp_type> fp_sec;
 
 struct experiment_configuration {
   const dataset& train_dataset;

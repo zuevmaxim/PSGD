@@ -28,22 +28,21 @@ public:
   const uint size;
   const uint* const permutation;
 
-  perm_node(uint size) : next(NULL), size(size), permutation(generate_permutation(size)) {}
+  explicit perm_node(uint size) : next(nullptr), size(size), permutation(generate_permutation(size)) {}
 
   ~perm_node() {
-      perm_node* next_node = next.load();
-      if (next_node != NULL) delete next_node;
+      delete next.load();
       delete[] permutation;
   }
 
   perm_node* gen_next() {
       perm_node* next_node = next.load();
-      if (next_node != NULL) return next_node;
+      if (next_node != nullptr) return next_node;
 
-      perm_node* const new_node = new perm_node(size);
+      auto* const new_node = new perm_node(size);
       perm_node* cur_node = this;
       while (true) {
-          perm_node* cur_next = NULL;
+          perm_node* cur_next = nullptr;
           if (cur_node->next.compare_exchange_strong(cur_next, new_node)) break;
           cur_node = cur_next;
       }
@@ -63,7 +62,7 @@ class permutation {
   perm_node* cluster_permutation;
 
 public:
-  permutation(uint clusters) {
+  explicit permutation(uint clusters) {
       cluster_permutation = new perm_node(clusters);
   }
 

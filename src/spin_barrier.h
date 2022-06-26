@@ -9,7 +9,7 @@
 
 class spin_barrier {
   const uint total;
-  std::atomic <uint> counter;
+  std::atomic<uint> counter;
 
 public:
   spin_barrier(uint total) : total(total), counter(0) {}

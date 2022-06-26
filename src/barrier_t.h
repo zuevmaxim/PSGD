@@ -20,10 +20,10 @@
 #ifdef __APPLE__ \
     // we have to use our own barrier and timer
 struct barrier_t {
-    std::mutex mux;
-    std::condition_variable cond;
-    int total;
-    std::atomic<int> current;
+  std::mutex mux;
+  std::condition_variable cond;
+  int total;
+  std::atomic<int> current;
 };
 #else
 typedef pthread_barrier_t barrier_t;
@@ -46,9 +46,9 @@ int barrier_wait(barrier_t* b) {
     const int start_epoch = cur / b->total;
     const int threshold = (start_epoch + 1) * b->total;
     if (cur + 1 == threshold) {
-      // wake up everyone, we're the last to the fence
-      b->cond.notify_all();
-      return 0;
+        // wake up everyone, we're the last to the fence
+        b->cond.notify_all();
+        return 0;
     }
     // otherwise, wait the fence
     while (b->current.load() < threshold) {

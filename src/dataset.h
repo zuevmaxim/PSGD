@@ -17,9 +17,9 @@ const uint SIZE_FP_TYPE = sizeof(fp_type);
 const uint SIZE_CHAR_PTR = sizeof(char*);
 
 struct tmp_point {
-  std::vector <fp_type> data;
-  std::vector <uint> indices;
-  fp_type label;
+  std::vector<fp_type> data;
+  std::vector<uint> indices;
+  fp_type label{};
 };
 
 struct data_point {
@@ -29,14 +29,14 @@ struct data_point {
   const fp_type* data;
 };
 
-std::vector <tmp_point> load_dataset_from_file(const std::string& name) {
+std::vector<tmp_point> load_dataset_from_file(const std::string& name) {
     std::ifstream in;
     in.open(name);
     if (!in) {
         std::cerr << "Failed to load dataset from " << name << std::endl;
         exit(1);
     }
-    std::vector <tmp_point> tmp_points;
+    std::vector<tmp_point> tmp_points;
     std::string str;
     while (std::getline(in, str)) {
         tmp_point p;
@@ -69,9 +69,9 @@ class dataset_local {
   char* data;
   char** points_ptr;
 
-  dataset_local(const std::vector <tmp_point>& points) {
+  explicit dataset_local(const std::vector<tmp_point>& points) {
       _size = points.size();
-      std::vector<int> p(_size);
+      std::vector<uint> p(_size);
       FOR_N(i, _size) {
           p[i] = i;
       }
@@ -116,7 +116,7 @@ class dataset_local {
   }
 
 public:
-  dataset_local(const std::string& name) : dataset_local(load_dataset_from_file(name)) {}
+  explicit dataset_local(const std::string& name) : dataset_local(load_dataset_from_file(name)) {}
 
   dataset_local(const dataset_local& other) : _size(other._size), _features(other._features), data_buffer_size(other.data_buffer_size) {
       data = new char[data_buffer_size];
@@ -133,7 +133,7 @@ public:
   }
 
   inline data_point operator[](const uint index) const {
-      data_point point;
+      data_point point{};
       const char* buffer = points_ptr[index];
       const uint point_size = *reinterpret_cast<const uint*>(buffer);
       point.size = point_size;
@@ -156,7 +156,7 @@ private:
   vector<dataset_local*> datasets;
 
 public:
-  dataset(int nodes, const std::string& name) {
+  dataset(uint nodes, const std::string& name) {
       datasets.init(nodes);
       FOR_N(i, nodes) {
           RUN_NUMA_START(i)

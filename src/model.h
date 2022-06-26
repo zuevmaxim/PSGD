@@ -96,10 +96,10 @@ namespace svm {
 #define MODEL_PARAMS SVMParams
 
 struct metric_summary {
-  std::atomic <uint> true_positive;
-  std::atomic <uint> true_negative;
-  std::atomic <uint> false_positive;
-  std::atomic <uint> false_negative;
+  std::atomic<uint> true_positive;
+  std::atomic<uint> true_negative;
+  std::atomic<uint> false_positive;
+  std::atomic<uint> false_negative;
 
   metric_summary() : true_positive(0), true_negative(0), false_positive(0), false_negative(0) {}
 

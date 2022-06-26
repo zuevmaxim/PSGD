@@ -21,8 +21,7 @@ private:
   unsigned cpus;
   unsigned nodes;
   unsigned phy_cpus;
-  std::vector <std::vector<std::vector < int>> >
-  cpu_ids;
+  std::vector<std::vector<std::vector<int>>> cpu_ids;
   std::vector<int> thread_core_mapping;
   std::vector<int> thread_node_mapping;
 
