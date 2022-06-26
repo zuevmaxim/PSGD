@@ -76,7 +76,7 @@ struct experiment_configuration {
       fp_type total_tests = 0;
 
       FOR_N(run, test_repeats) {
-          std::unique_ptr <T> scheme(create_scheme<T>(features, &svm_params));
+          std::unique_ptr<T> scheme(create_scheme<T>(features, &svm_params));
 
           std::vector<void*> results;
           auto start = Time::now();
@@ -133,6 +133,8 @@ struct experiment_configuration {
                 << " algorithm=" << algorithm
                 << " threads=" << threads
                 << " block_size=" << block_size
+                << " step_decay=" << step_decay
+                << " update_delay=" << update_delay
                 << " convergence=" << total_tests
                 << " time=" << total_time
                 << " epochs=" << total_epochs
