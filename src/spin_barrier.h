@@ -12,7 +12,7 @@ class spin_barrier {
   std::atomic<uint> counter;
 
 public:
-  spin_barrier(uint total) : total(total), counter(0) {}
+  explicit spin_barrier(uint total) : total(total), counter(0) {}
 
   void wait() {
       const uint value = counter.fetch_add(1);

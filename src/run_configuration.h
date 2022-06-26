@@ -62,7 +62,7 @@ struct experiment_configuration {
       const uint features = train_dataset.get_features();
       SVMParams svm_params(mu, &train_dataset);
 
-      sgd_params params;
+      sgd_params params{};
       params.max_epochs = max_epochs;
       params.target_score = target_score;
       params.step_decay = step_decay;

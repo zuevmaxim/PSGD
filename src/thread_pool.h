@@ -99,7 +99,7 @@ public:
 
   std::vector<tp_task_return_t> execute(tp_task_t hook, tp_task_internal_args_t hook_args) {
       task.store(hook);
-      args = hook_args;
+      args.store(hook_args);
       barrier_wait(&ready);
       barrier_wait(&finished);
       task.store(NULL);
