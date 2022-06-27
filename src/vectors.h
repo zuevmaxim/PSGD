@@ -12,7 +12,7 @@
 template<typename T>
 class vector {
 public:
-  uint size;
+  uint size = 0;
   T* data = NULL;
 
   vector() = default;
