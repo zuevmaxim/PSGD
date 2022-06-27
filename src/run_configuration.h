@@ -16,6 +16,8 @@ typedef std::chrono::high_resolution_clock Time;
 typedef std::chrono::duration<fp_type> fp_sec;
 
 struct experiment_configuration {
+  static bool verbose;
+
   const dataset& train_dataset;
   const dataset& test_dataset;
   const dataset& validate_dataset;
@@ -47,15 +49,17 @@ struct experiment_configuration {
 
   template<typename T>
   void run_experiments_internal() {
-      std::cout << "Start experiments (" << test_repeats << ") with " << algorithm << " algorithm"
-                << " threads=" << threads
-                << (algorithm == "HogWild" ? "" : " cluster_size=" + std::to_string(cluster_size))
-                << " target_score=" << target_score
-                << " step_size=" << step_size
-                << " step_decay=" << step_decay
-                << (algorithm == "HogWild" ? "" : " update_delay=" + std::to_string(update_delay))
-                << " block_size=" << block_size
-                << std::endl;
+      if (verbose) {
+          std::cout << "Start experiments (" << test_repeats << ") with " << algorithm << " algorithm"
+                    << " threads=" << threads
+                    << (algorithm == "HogWild" ? "" : " cluster_size=" + std::to_string(cluster_size))
+                    << " target_score=" << target_score
+                    << " step_size=" << step_size
+                    << " step_decay=" << step_decay
+                    << (algorithm == "HogWild" ? "" : " update_delay=" + std::to_string(update_delay))
+                    << " block_size=" << block_size
+                    << std::endl;
+      }
 
       thread_pool tp(threads);
 
@@ -97,13 +101,15 @@ struct experiment_configuration {
           fp_type time = static_cast<fp_sec>(end - start).count();
           fp_type epoch_time = time / average_epochs;
 
-          std::cout << std::fixed << std::setprecision(5) << std::setfill(' ')
-                    << "Experiment " << run + 1 << "/" << test_repeats
-                    << " completed with " << (success ? "SUCCESS" : "FAIL")
-                    << " time=" << time
-                    << " epochs=" << average_epochs
-                    << " per_epoch=" << epoch_time
-                    << std::endl;
+          if (verbose) {
+              std::cout << std::fixed << std::setprecision(5) << std::setfill(' ')
+                        << "Experiment " << run + 1 << "/" << test_repeats
+                        << " completed with " << (success ? "SUCCESS" : "FAIL")
+                        << " time=" << time
+                        << " epochs=" << average_epochs
+                        << " per_epoch=" << epoch_time
+                        << std::endl;
+          }
 
           output
               << algorithm << ',' << threads << ',' << cluster_size << ',' << (success ? 1 : 0) << ','
@@ -114,8 +120,10 @@ struct experiment_configuration {
               << std::endl;
 
           if (!success) {
+              if (!verbose) std::cout << '!' << std::flush;
               continue;
           }
+          if (!verbose) std::cout << '.' << std::flush;
 
           total_time += time;
           total_epochs += average_epochs;
@@ -129,7 +137,8 @@ struct experiment_configuration {
       total_tests /= test_repeats;
 
 
-      std::cout << "\nAverage results:"
+      std::cout << (verbose ? "" : "\n")
+                << "Average results:"
                 << " algorithm=" << algorithm
                 << " threads=" << threads
                 << " block_size=" << block_size
@@ -154,6 +163,8 @@ struct experiment_configuration {
       }
   }
 };
+
+bool experiment_configuration::verbose = false;
 
 template<>
 hogwild_data_scheme* experiment_configuration::create_scheme(uint features, void* model_args) {

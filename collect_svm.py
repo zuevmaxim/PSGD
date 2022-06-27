@@ -155,7 +155,9 @@ if __name__ == "__main__":
                                 ))
         input_file.write("exit\n")
         input_file.close()
-        cmd_line = "bin/svm data/{} data/{}.t data/{}.t {} {}".format(d, d, d, output_file, input_path)
+        verbose = "-v" in sys.argv
+        v = " -v" if verbose else ""
+        cmd_line = "bin/svm data/{} data/{}.t data/{}.t {} {}{}".format(d, d, d, output_file, input_path, v)
         print(cmd_line)
         if not is_dry_run():
             subprocess.Popen(cmd_line, shell=True).wait()
