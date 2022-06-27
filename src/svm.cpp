@@ -41,6 +41,11 @@ int main(int argc, char** argv) {
         exit(3);
     }
 
+
+    if (argc > 6 && strcmp("-v", argv[6]) == 0) {
+        experiment_configuration::verbose = true;
+    }
+
     std::cout << "Loading completed!" << std::endl;
 
     std::string command;
