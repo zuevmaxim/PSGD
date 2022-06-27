@@ -82,7 +82,7 @@ def generate_update_delays(algorithm, nweights):
     else:
         update_delay = 4
     return [update_delay]
-    # return [update_delay * (2 ** i) for i in [-3, -1, 0, 1, 3]]
+    # return [int(update_delay * (2 ** i)) for i in [-3, -1, 0, 1, 3]]
 
 
 def get_epochs(d, iterations):
