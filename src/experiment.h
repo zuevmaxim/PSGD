@@ -86,7 +86,7 @@ void* thread_task(void* args, const uint thread_id) {
     const dataset_local& validate = task.validate.get_data(node);
     T* const scheme = task.data_scheme;
     vector<fp_type>* const w = scheme->get_model_vector(thread_id);
-    MODEL_PARAMS* const model_args = reinterpret_cast<MODEL_PARAMS*>(scheme->get_model_args(thread_id));
+    auto* const model_args = reinterpret_cast<MODEL_PARAMS*>(scheme->get_model_args(thread_id));
 
     perm_node* cluster_perm = task.perm->get_cluster_permutation();
     const uint threads_per_cluster = task.threads / cluster_perm->size;

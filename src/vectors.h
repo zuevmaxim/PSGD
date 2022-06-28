@@ -22,14 +22,14 @@ public:
       std::copy(other.data, other.data + size, data);
   }
 
-  void init(uint size) {
-      this->size = size;
+  void init(uint _size) {
+      size = _size;
       assert(data == NULL);
       data = new T[size];
   }
 
-  void init(uint size, const T& value) {
-      init(size);
+  void init(uint _size, const T& value) {
+      init(_size);
       std::fill(data, data + size, value);
   }
 

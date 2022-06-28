@@ -18,7 +18,6 @@
 //   virtual vector<fp_type>* get_model_vector(uint thread_id) = 0;
 //   virtual inline void post_update(uint thread_id, fp_type step) = 0;
 //   virtual abstract_data_scheme* clone() = 0;
-//   virtual uint number_of_copies() const = 0;
 // };
 
 class hogwild_data_scheme final {
@@ -53,10 +52,6 @@ public:
   hogwild_data_scheme* clone() {
       return new hogwild_data_scheme(*this);
   }
-
-  uint number_of_copies() const {
-      return 1;
-  }
 };
 
 struct hogwild_XX_params {
@@ -83,7 +78,7 @@ struct hogwild_XX_params {
   }
 
 private:
-  static fp_type SolveBeta(int n) {
+  static fp_type SolveBeta(uint n) {
       fp_type start = 0.6;
       fp_type end = 1.0;
       fp_type mid = 0.5;
@@ -211,7 +206,7 @@ public:
       }
 
       const uint size = old_w[model]->size;
-      fp_type* const old_w = this->old_w[model]->data;
+      fp_type* const old_ws = old_w[model]->data;
       fp_type* const cur_w = w[model]->data;
       fp_type* const next_w = w[next_model]->data;
 
@@ -221,41 +216,35 @@ public:
 
       FOR_N(i, size) {
           const fp_type wi = cur_w[i];
-          const fp_type delta = (wi - old_w[i]) * step;
-          const fp_type next = next_w[i];
+          const fp_type delta = (wi - old_ws[i]) * step;
+          const fp_type next_i = next_w[i];
           if (std::fabs(delta) > tolerance) {
-              const fp_type new_wi = next * lambda + wi * (1 - lambda) + (beta + lambda - 1) * delta;
-              next_w[i] = next + beta * delta;
+              const fp_type new_wi = next_i * lambda + wi * (1 - lambda) + (beta + lambda - 1) * delta;
+              next_w[i] = next_i + beta * delta;
               cur_w[i] = new_wi;
-              old_w[i] = new_wi;
+              old_ws[i] = new_wi;
           } else {
-              const fp_type new_wi = next * lambda + wi * (1 - lambda) + lambda * delta;
+              const fp_type new_wi = next_i * lambda + wi * (1 - lambda) + lambda * delta;
               cur_w[i] = new_wi;
-              old_w[i] = new_wi - delta;
+              old_ws[i] = new_wi - delta;
           }
       }
 
       delay = params.delay;
       *sync_thread = next_id;
   }
-
-  uint number_of_copies() const {
-      return params.cluster_count;
-  }
 };
 
 struct mywild_params {
   const uint threads;
   const uint cluster_size;
-  const fp_type tolerance;
   const uint phy_threads;
   const uint cluster_count;
   const uint delay;
 
-  mywild_params(uint threads, uint cluster_size, fp_type tolerance, uint delay)
+  mywild_params(uint threads, uint cluster_size, uint delay)
       : threads(threads),
         cluster_size(cluster_size),
-        tolerance(tolerance),
         phy_threads(std::min(threads, config.get_phy_cpus())),
         cluster_count(phy_threads / cluster_size),
         delay(delay * phy_threads) {
@@ -367,18 +356,14 @@ public:
 
       FOR_N(i, size) {
           const fp_type wi = cur_w[i];
-          const fp_type next = next_w[i];
-          const fp_type new_wi = (wi + next) / 2;
+          const fp_type next_i = next_w[i];
+          const fp_type new_wi = (wi + next_i) / 2;
           cur_w[i] += new_wi - wi;
-          next_w[i] += new_wi - next;
+          next_w[i] += new_wi - next_i;
       }
 
       delay = params.delay;
       *sync_thread = next_id;
-  }
-
-  uint number_of_copies() const {
-      return params.cluster_count;
   }
 };
 

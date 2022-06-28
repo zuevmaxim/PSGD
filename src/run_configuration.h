@@ -181,7 +181,7 @@ hogwild_XX_data_scheme<SVMParams>* experiment_configuration::create_scheme(uint 
 template<>
 mywild_data_scheme<SVMParams>* experiment_configuration::create_scheme(uint features, void* model_args) {
     auto svm_params = reinterpret_cast<SVMParams*>(model_args);
-    mywild_params params(threads, cluster_size, tolerance, update_delay);
+    mywild_params params(threads, cluster_size, update_delay);
     return new mywild_data_scheme<SVMParams>(features, svm_params, params);
 }
 

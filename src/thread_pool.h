@@ -28,16 +28,16 @@ typedef tp_task_return_t(* tp_task_t)(tp_task_internal_args_t, unsigned);
 class thread_pool {
 private:
   const uint size;
-  uint max_numa_node;
+  uint max_numa_node{};
   std::vector<pthread_t> threads;
   std::vector<thread_data> thread_datas;
   std::vector<tp_task_return_t> results;
-  std::atomic<bool> stop;
+  std::atomic<bool> stop{};
   barrier_t ready;
   barrier_t finished;
 
-  std::atomic<tp_task_t> task;
-  std::atomic<tp_task_internal_args_t> args;
+  std::atomic<tp_task_t> task{};
+  std::atomic<tp_task_internal_args_t> args{};
 
 
   void thread_loop(uint thread_id) {
@@ -47,20 +47,20 @@ private:
           if (stop.load()) break;
           auto a_task = task.load();
           auto the_args = args.load();
-          assert(a_task != NULL);
+          assert(a_task != nullptr);
           results[thread_id] = a_task(the_args, thread_id);
           barrier_wait(&finished);
       }
   }
 
   static void* thread_run(void* data) {
-      thread_data* td = reinterpret_cast<thread_data*>(data);
+      auto* td = reinterpret_cast<thread_data*>(data);
       td->tp->thread_loop(td->id);
-      return NULL;
+      return nullptr;
   }
 
 public:
-  thread_pool(uint size) : size(size) {
+  explicit thread_pool(uint size) : size(size) {
       threads.resize(size);
       thread_datas.resize(size);
       results.resize(size);
@@ -70,12 +70,12 @@ public:
       }
 
       stop.store(false);
-      barrier_init(&ready, NULL, size + 1);
-      barrier_init(&finished, NULL, size + 1);
+      barrier_init(&ready, nullptr, size + 1);
+      barrier_init(&finished, nullptr, size + 1);
       max_numa_node = 0;
       FOR_N(i, size) {
           max_numa_node = std::max(max_numa_node, config.get_node_for_thread(i));
-          pthread_create(&threads[i], NULL, thread_pool::thread_run, reinterpret_cast<void*>(&thread_datas[i]));
+          pthread_create(&threads[i], nullptr, thread_pool::thread_run, reinterpret_cast<void*>(&thread_datas[i]));
       }
   }
 
@@ -83,7 +83,7 @@ public:
       stop.store(true);
       barrier_wait(&ready);
       FOR_N(i, size) {
-          pthread_join(threads[i], NULL);
+          pthread_join(threads[i], nullptr);
       }
       barrier_destroy(&ready);
       barrier_destroy(&finished);

@@ -22,14 +22,14 @@
 struct barrier_t {
   std::mutex mux;
   std::condition_variable cond;
-  int total;
+  unsigned int total;
   std::atomic<int> current;
 };
 #else
 typedef pthread_barrier_t barrier_t;
 #endif
 
-int barrier_init(barrier_t* b, void* attr, int count) {
+int barrier_init(barrier_t* b, void* attr, unsigned int count) {
 #ifdef __APPLE__
     b->current.store(0);
     b->total = count;
@@ -42,9 +42,9 @@ int barrier_init(barrier_t* b, void* attr, int count) {
 int barrier_wait(barrier_t* b) {
 #ifdef __APPLE__
     std::unique_lock<std::mutex> lock(b->mux);
-    const int cur = b->current.fetch_add(1);
-    const int start_epoch = cur / b->total;
-    const int threshold = (start_epoch + 1) * b->total;
+    const unsigned int cur = b->current.fetch_add(1);
+    const unsigned int start_epoch = cur / b->total;
+    const unsigned int threshold = (start_epoch + 1) * b->total;
     if (cur + 1 == threshold) {
         // wake up everyone, we're the last to the fence
         b->cond.notify_all();
