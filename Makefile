@@ -2,7 +2,12 @@ CPP=g++ --std=c++11
 CPP += -O3 -march=native
 #CPP += -O0 -g -fsanitize=address
 
-LIBS=-lpthread -lnuma
+ifeq (, $(shell which numactl))
+ $(info No numa available)
+else
+ NUMA_LIB=-lnuma
+endif
+LIBS=-lpthread $(NUMA_LIB)
 
 all: bin/svm
 
