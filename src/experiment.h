@@ -111,7 +111,6 @@ void* thread_task(void* args, const uint thread_id) {
     }
 
     const uint n = task.params.max_epochs;
-    uint epochs = n;
     FOR_N(e, n) {
         const fp_type step = task.params.step;
         const uint c = cluster_perm->permutation[cluster_id];
@@ -139,12 +138,12 @@ void* thread_task(void* args, const uint thread_id) {
         task.barrier->wait();
         const fp_type current_score = task.metric->to_score();
         if (unlikely(current_score >= target_score)) {
-            epochs = e + 1;
-            break;
+            return new uint(e + 1);
         }
         perm_node::shuffle(blocks_perm.data, blocks_per_thread);
     }
-    return new uint(epochs);
+    task.metric->zero();
+    return new uint(n + 1);
 }
 
 template<typename T>

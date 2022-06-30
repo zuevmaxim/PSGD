@@ -73,7 +73,6 @@ struct experiment_configuration {
       params.step = step_size;
       params.block_size = block_size;
 
-      bool success;
       fp_type total_time = 0;
       fp_type total_epochs = 0;
       fp_type total_epoch_time = 0;
@@ -84,7 +83,7 @@ struct experiment_configuration {
 
           std::vector<void*> results;
           auto start = Time::now();
-          success = run_experiment<T>(train_dataset, validate_dataset, tp, &params, scheme.get(), results);
+          bool success = run_experiment<T>(train_dataset, validate_dataset, tp, &params, scheme.get(), results);
           auto end = Time::now();
 
           uint epochs = 0;
