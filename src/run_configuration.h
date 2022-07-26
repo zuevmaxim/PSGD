@@ -118,11 +118,8 @@ struct experiment_configuration {
               << target_score << ',' << block_size
               << std::endl;
 
-          if (!success) {
-              if (!verbose) std::cout << '!' << std::flush;
-              continue;
-          }
-          if (!verbose) std::cout << '.' << std::flush;
+          if (!verbose) std::cout << (success ? '.' : '!') << std::flush;
+          if (!success) continue;
 
           total_time += time;
           total_epochs += average_epochs;

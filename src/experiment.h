@@ -143,7 +143,7 @@ void* thread_task(void* args, const uint thread_id) {
         perm_node::shuffle(blocks_perm.data, blocks_per_thread);
     }
     task.metric->zero();
-    return new uint(n + 1);
+    return new uint(n);
 }
 
 template<typename T>
