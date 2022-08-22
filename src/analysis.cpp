@@ -54,20 +54,40 @@ struct Individual {
       calculate_score();
   }
 
-  void apply_swaps(bool recalculate) {
+  void apply_swaps() {
       for (Swap& swap: swaps) {
           uint i = swap.first, j = swap.second;
           uint part_i = get_part(i), part_j = get_part(j);
-          if (recalculate) {
-              const data_point& point_i = (*my_dataset)[permutation[i]];
-              FOR_N(k, point_i.size) {
-                  score[part_i][point_i.indices[k]]--;
-                  score[part_j][point_i.indices[k]]++;
+          const data_point& point_i = (*my_dataset)[permutation[i]];
+          FOR_N(k, point_i.size) {
+              uint f = point_i.indices[k];
+              if (cache_score != -1) {
+                  cache_score -= get_score(part_i, f);
               }
-              const data_point& point_j = (*my_dataset)[permutation[j]];
-              FOR_N(k, point_j.size) {
-                  score[part_i][point_j.indices[k]]++;
-                  score[part_j][point_j.indices[k]]--;
+              score[part_i][f]--;
+              if (cache_score != -1) {
+                  cache_score += get_score(part_i, f);
+                  cache_score -= get_score(part_j, f);
+              }
+              score[part_j][f]++;
+              if (cache_score != -1) {
+                  cache_score += get_score(part_j, f);
+              }
+          }
+          const data_point& point_j = (*my_dataset)[permutation[j]];
+          FOR_N(k, point_j.size) {
+              uint f = point_j.indices[k];
+              if (cache_score != -1) {
+                  cache_score -= get_score(part_i, f);
+              }
+              score[part_i][f]++;
+              if (cache_score != -1) {
+                  cache_score += get_score(part_i, f);
+                  cache_score -= get_score(part_j, f);
+              }
+              score[part_j][f]--;
+              if (cache_score != -1) {
+                  cache_score += get_score(part_j, f);
               }
           }
           std::swap(permutation[i], permutation[j]);
@@ -97,8 +117,11 @@ struct Individual {
   }
 
   uint get_score() {
-      if (swaps.empty() && cache_score != -1) return cache_score;
-      apply_swaps(true);
+      if (!swaps.empty()) {
+          apply_swaps();
+      }
+      if (cache_score != -1) return cache_score;
+
       uint total = 0;
       FOR_N(f, F) {
           total += get_score(f);
@@ -113,6 +136,15 @@ struct Individual {
           for (uint j = i + 1; j < GROUPS; ++j) {
               total += std::min(score[i][f], score[j][f]);
           }
+      }
+      return total;
+  }
+
+  inline uint get_score(uint g, uint f) const {
+      uint total = 0;
+      FOR_N(j, GROUPS) {
+          if (j == g) continue;
+          total += std::min(score[g][f], score[j][f]);
       }
       return total;
   }
@@ -142,18 +174,6 @@ struct Individual {
       return result;
   }
 
-  void calculate_score() {
-      apply_swaps(false);
-      FOR_N(i, my_dataset->get_size()) {
-          uint part = get_part(i);
-          const data_point& point = (*my_dataset)[permutation[i]];
-          FOR_N(j, point.size) {
-              score[part][point.indices[j]]++;
-          }
-      }
-      cache_score = get_score();
-  }
-
   bool operator<(const Individual& other) const {
       auto* my = const_cast<Individual*>(this);
       auto* o = const_cast<Individual*>(&other);
@@ -179,7 +199,7 @@ struct Individual {
   }
 
   bool dump(const std::string& file_name) {
-      apply_swaps(true);
+      apply_swaps();
       std::ofstream file;
       file.open(file_name);
       if (!file.good()) {
@@ -211,6 +231,16 @@ struct Individual {
       return result;
   }
 
+  void sort_in_groups() {
+      FOR_N(part, GROUPS) {
+          uint begin = PER_PART * part;
+          uint end = part == GROUPS - 1 ? N : PER_PART * (part + 1);
+          std::sort(permutation.data() + begin, permutation.data() + end, [&](int i, int j) {
+            return score_point(part, i) < score_point(part, j);
+          });
+      }
+  }
+
 private:
   int score_point(uint part, int i) {
       int score_i = 0;
@@ -228,17 +258,20 @@ private:
       return score_i;
   }
 
-public:
-
-  void sort_in_groups() {
-      FOR_N(part, GROUPS) {
-          uint begin = PER_PART * part;
-          uint end = part == GROUPS - 1 ? N : PER_PART * (part + 1);
-          std::sort(permutation.data() + begin, permutation.data() + end, [&](int i, int j) {
-            return score_point(part, i) < score_point(part, j);
-          });
+  void calculate_score() {
+      FOR_N(i, GROUPS) {
+          std::fill(score[i].begin(), score[i].end(), 0);
       }
+      FOR_N(i, my_dataset->get_size()) {
+          uint part = get_part(i);
+          const data_point& point = (*my_dataset)[permutation[i]];
+          FOR_N(j, point.size) {
+              score[part][point.indices[j]]++;
+          }
+      }
+      get_score();
   }
+
 };
 
 
