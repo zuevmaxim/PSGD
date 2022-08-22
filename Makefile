@@ -8,7 +8,7 @@ else
 endif
 LIBS=-lpthread $(NUMA_LIB)
 
-all: bin/svm
+all: bin/svm bin/analysis
 
 bin:
 	mkdir -p "bin"
@@ -20,6 +20,9 @@ bin/svm: bin src/svm.cpp
 
 clean:
 	rm -rf bin/*
+
+bin/analysis: bin src/analysis.cpp
+	$(CPP) -o bin/analysis src/analysis.cpp
 
 
 datasets: data rcv1 news20 url kdda
