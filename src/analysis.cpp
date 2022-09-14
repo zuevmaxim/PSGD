@@ -6,6 +6,7 @@
 #include <deque>
 #include <unordered_set>
 
+bool VERBOSE = false;
 uint GROUPS = 0;
 uint N = 0;
 uint F = 0;
@@ -33,66 +34,59 @@ std::mt19937 create_random_generator() {
 struct Individual {
   std::vector<uint> permutation;
   std::vector<Swap> swaps;
-  std::vector<std::vector<uint>> score;
+  std::vector<std::vector<uint>> group_count;
   uint cache_score = -1;
+  std::uniform_int_distribution<uint> distribution;
+  std::mt19937 gen;
 
-  Individual() {
-      score.resize(GROUPS);
+  Individual() : distribution(0, N), gen(create_random_generator()) {
+      group_count.resize(GROUPS);
       permutation.resize(N);
       FOR_N(i, N) {
           permutation[i] = i;
       }
       FOR_N(group, GROUPS) {
-          score[group].resize(F, 0);
+          group_count[group].resize(F, 0);
       }
   }
 
   explicit Individual(bool shuffle) : Individual() {
       if (shuffle) {
-          std::shuffle(permutation.begin(), permutation.end(), create_random_generator());
+          std::shuffle(permutation.begin(), permutation.end(), gen);
       }
-      calculate_score();
+      calculate_group_count();
   }
 
   void apply_swaps() {
       for (Swap& swap: swaps) {
           uint i = swap.first, j = swap.second;
           uint part_i = get_part(i), part_j = get_part(j);
-          const data_point& point_i = (*my_dataset)[permutation[i]];
-          FOR_N(k, point_i.size) {
-              uint f = point_i.indices[k];
-              if (cache_score != -1) {
-                  cache_score -= get_score(part_i, f);
-              }
-              score[part_i][f]--;
-              if (cache_score != -1) {
-                  cache_score += get_score(part_i, f);
-                  cache_score -= get_score(part_j, f);
-              }
-              score[part_j][f]++;
-              if (cache_score != -1) {
-                  cache_score += get_score(part_j, f);
-              }
-          }
-          const data_point& point_j = (*my_dataset)[permutation[j]];
-          FOR_N(k, point_j.size) {
-              uint f = point_j.indices[k];
-              if (cache_score != -1) {
-                  cache_score -= get_score(part_i, f);
-              }
-              score[part_i][f]++;
-              if (cache_score != -1) {
-                  cache_score += get_score(part_i, f);
-                  cache_score -= get_score(part_j, f);
-              }
-              score[part_j][f]--;
-              if (cache_score != -1) {
-                  cache_score += get_score(part_j, f);
-              }
-          }
+          assert(part_i != part_j);
+          move_element(i, part_i, part_j);
+          move_element(j, part_j, part_i);
           std::swap(permutation[i], permutation[j]);
       }
       swaps.clear();
+  }
+
+  void move_element(uint index, uint part_from, uint part_to) {
+      const bool update_cache = cache_score != -1;
+      const data_point& point = (*my_dataset)[permutation[index]];
+      FOR_N(k, point.size) {
+          uint f = point.indices[k];
+          if (update_cache) {
+              cache_score -= get_score(part_from, f);
+          }
+          group_count[part_from][f]--;
+          if (update_cache) {
+              cache_score += get_score(part_from, f);
+              cache_score -= get_score(part_to, f);
+          }
+          group_count[part_to][f]++;
+          if (update_cache) {
+              cache_score += get_score(part_to, f);
+          }
+      }
   }
 
   static inline uint get_part(uint i) {
@@ -100,8 +94,6 @@ struct Individual {
   }
 
   Swap mutate() {
-      std::uniform_int_distribution<uint> distribution(0, N - 1);
-      auto gen = create_random_generator();
       uint i = distribution(gen), j = distribution(gen);
       uint part_i = get_part(i), part_j = get_part(j);
       while (part_i == part_j) {
@@ -134,7 +126,7 @@ struct Individual {
       uint total = 0;
       FOR_N(i, GROUPS) {
           for (uint j = i + 1; j < GROUPS; ++j) {
-              total += std::min(score[i][f], score[j][f]);
+              total += std::min(group_count[i][f], group_count[j][f]);
           }
       }
       return total;
@@ -144,7 +136,7 @@ struct Individual {
       uint total = 0;
       FOR_N(j, GROUPS) {
           if (j == g) continue;
-          total += std::min(score[g][f], score[j][f]);
+          total += std::min(group_count[g][f], group_count[j][f]);
       }
       return total;
   }
@@ -163,11 +155,11 @@ struct Individual {
           FOR_N(k, point.size) {
               uint f = point.indices[k];
               current_features_score += (int) get_score(f);
-              score[my_part][f]--;
-              score[part][f]++;
+              group_count[my_part][f]--;
+              group_count[part][f]++;
               new_features_score += (int) get_score(f);
-              score[my_part][f]++;
-              score[part][f]--;
+              group_count[my_part][f]++;
+              group_count[part][f]--;
           }
           result.push_back({index_in_permutation, my_part, part, new_features_score - current_features_score});
       }
@@ -227,46 +219,50 @@ struct Individual {
       while (file >> index) {
           result.permutation[i++] = index;
       }
-      result.calculate_score();
+      result.calculate_group_count();
       return result;
   }
 
   void sort_in_groups() {
+      std::vector<int> point_score_buffer(N, -1);
       FOR_N(part, GROUPS) {
           uint begin = PER_PART * part;
           uint end = part == GROUPS - 1 ? N : PER_PART * (part + 1);
           std::sort(permutation.data() + begin, permutation.data() + end, [&](int i, int j) {
-            return score_point(part, i) < score_point(part, j);
+            return score_point_in_group(part, i, point_score_buffer) < score_point_in_group(part, j, point_score_buffer);
           });
       }
   }
 
 private:
-  int score_point(uint part, int i) {
+  int score_point_in_group(uint part, int i, std::vector<int>& score_buffer) {
+      int& point_score = score_buffer[i];
+      if (point_score != -1) return point_score;
       int score_i = 0;
       const data_point& point_i = (*my_dataset)[i];
       FOR_N(s, point_i.size) {
           uint f = point_i.indices[s];
           FOR_N(g, GROUPS) {
               if (g == part) {
-                  score_i += (GROUPS - 1) * score[g][f];
+                  score_i += (GROUPS - 1) * group_count[g][f];
               } else {
-                  score_i -= score[g][f];
+                  score_i -= group_count[g][f];
               }
           }
       }
+      point_score = score_i;
       return score_i;
   }
 
-  void calculate_score() {
+  void calculate_group_count() {
       FOR_N(i, GROUPS) {
-          std::fill(score[i].begin(), score[i].end(), 0);
+          std::fill(group_count[i].begin(), group_count[i].end(), 0);
       }
       FOR_N(i, my_dataset->get_size()) {
           uint part = get_part(i);
           const data_point& point = (*my_dataset)[permutation[i]];
           FOR_N(j, point.size) {
-              score[part][point.indices[j]]++;
+              group_count[part][point.indices[j]]++;
           }
       }
       get_score();
@@ -274,23 +270,22 @@ private:
 
 };
 
+double get_improvement(const uint initial_score, uint score) {
+    return int((1 - double(score) / initial_score) * 1000) / 10.0;
+}
 
-Individual genetic_algorithm(const std::string& output_dir, uint fail_tries_threshold, uint max_failed_epochs) {
-    Individual best(false);
+void genetic_algorithm(Individual& best, uint fail_tries_threshold, uint max_failed_epochs) {
+    const uint initial_best_score = best.get_score();
+    uint current_score = initial_best_score;
 
-    uint initial_best_score = best.get_score();
-    uint current_best_score = initial_best_score;
-    std::cout << "Initial score is " << initial_best_score << std::endl;
-
-    int best_improvement = 0;
     uint failed_epochs = 0;
     FOR_N(epoch, INT_MAX) {
         uint failed_tries = 0;
         while (failed_tries <= fail_tries_threshold) {
             Swap swap = best.mutate();
             uint score = best.get_score();
-            if (score < current_best_score) {
-                current_best_score = score;
+            if (score < current_score) {
+                current_score = score;
                 break;
             }
             best.revert_mutation(swap);
@@ -298,26 +293,23 @@ Individual genetic_algorithm(const std::string& output_dir, uint fail_tries_thre
         }
         if (failed_tries > fail_tries_threshold) {
             failed_epochs++;
-            std::cout << failed_tries << " was not enough to generate new mutation " << failed_epochs << "/" << max_failed_epochs << std::endl;
+            if (VERBOSE) {
+                std::cout << failed_tries << " was not enough to generate new mutation " << failed_epochs << "/" << max_failed_epochs << std::endl;
+            }
             if (failed_epochs >= max_failed_epochs) break;
         }
-        if ((epoch & 0xfff) == 0xfff) {
-            int improvement = int((1 - double(current_best_score) / initial_best_score) * 100);
-            if (improvement > best_improvement) {
-                best_improvement = improvement;
-                bool success = best.dump(output_dir + "/" + std::to_string(improvement) + ".txt");
-                if (success) {
-                    std::remove((output_dir + "/" + std::to_string(improvement - 1) + ".txt").c_str());
-                }
+
+        if (VERBOSE) {
+            if ((epoch & 0xfff) == 0xfff) {
+                std::cout << "epoch " << epoch + 1
+                          << " best score is " << current_score
+                          << " it is " << get_improvement(initial_best_score, current_score) << "% less than initial score"
+                          << std::endl;
             }
-            std::cout << "epoch " << epoch + 1
-                      << " best score is " << current_best_score
-                      << " it is " << improvement << "% less than initial score"
-                      << std::endl;
         }
     }
-    best.dump(output_dir + "/best.txt");
-    return best;
+
+    best.sort_in_groups();
 }
 
 std::vector<std::vector<std::vector<ScoreAndIndex>>> get_preferences(Individual& best) {
@@ -420,11 +412,8 @@ bool find_best_swap(std::vector<std::vector<std::vector<ScoreAndIndex>>>& s,
     return true;
 }
 
-Individual greedy_algorithm(const std::string& output_dir, const std::string& initial_individual) {
-    Individual best = initial_individual == "basic" ? Individual(false) : Individual::load(initial_individual);
-    uint initial_best_score = best.get_score();
-
-    std::cout << "Initial score is " << initial_best_score << std::endl;
+void greedy_algorithm(Individual& best) {
+    const uint initial_best_score = best.get_score();
 
     uint current_score = initial_best_score;
     while (true) {
@@ -444,16 +433,14 @@ Individual greedy_algorithm(const std::string& output_dir, const std::string& in
         uint current_best_score = best.get_score();
         if (current_best_score >= current_score) break;
         current_score = current_best_score;
-        int improvement = int((1 - double(current_best_score) / initial_best_score) * 100);
-        std::cout << "best score is " << current_best_score
-                  << " it is " << improvement << "% less than initial score"
-                  << std::endl;
+        if (VERBOSE) {
+            std::cout << "best score is " << current_best_score
+                      << " it is " << get_improvement(initial_best_score, current_score) << "% less than initial score"
+                      << std::endl;
+        }
     }
 
     best.sort_in_groups();
-    best.dump(output_dir + "/best-final.txt");
-
-    return best;
 }
 
 
@@ -462,9 +449,9 @@ int main(int argc, char** argv) {
 
     GROUPS = std::atoi(argv[1]);
     std::string dataset_path = argv[2];
-    std::string output_dir = argv[3];
+    std::string output_path = argv[3];
 
-    uint fail_tries_threshold = 200;
+    uint fail_tries_threshold = 300;
     uint max_failed_epochs = 100;
 
 
@@ -472,12 +459,21 @@ int main(int argc, char** argv) {
     N = my_dataset->get_size();
     F = my_dataset->get_features();
     PER_PART = N / GROUPS;
-    std::cout << "Dataset loaded! " << my_dataset->get_size() << "x" << my_dataset->get_features() << std::endl;
+    VERBOSE = "-v" == std::string(argv[argc - 1]);
 
-    if (argc == 4) {
-        genetic_algorithm(output_dir, fail_tries_threshold, max_failed_epochs);
-    } else {
-        std::string initial = argv[4];
-        greedy_algorithm(output_dir, initial);
-    }
+    Individual best = argc == 4 && !VERBOSE || argc > 4 ? Individual(false) : Individual::load(argv[4]);
+    const uint initial_score = best.get_score();
+
+    genetic_algorithm(best, fail_tries_threshold, max_failed_epochs);
+    double genetic_improvement = get_improvement(initial_score, best.get_score());
+
+    greedy_algorithm(best);
+    double greedy_improvement = get_improvement(initial_score, best.get_score());
+
+    best.dump(output_path);
+
+    std::cout << "Optimization completed. Initial score was " << initial_score
+              << " genetic optimized " << genetic_improvement << "%"
+              << " greedy optimized " << greedy_improvement - genetic_improvement << "%"
+              << std::endl;
 }
