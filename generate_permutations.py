@@ -8,15 +8,20 @@ if __name__ == "__main__":
     for d in datasets:
         output_dir = "permutations/{}".format(d)
         check_call("mkdir -p {}/".format(output_dir), shell=True)
-        for parts in nthreads:
-            if parts == 1:
-                continue
-            output_file = "{}/{}.txt".format(output_dir, parts)
-            if path.exists(output_file):
-                print("Permutation for dataset {} in {} parts is already generated, remove {} file to rerun"
-                      .format(d, parts, output_file))
-                continue
+        for threads in nthreads:
+            phy_threads = min(threads, phy_cores)
+            for clusters in get_clusters("HogWild++", phy_threads):
+                parts = phy_threads // clusters
+                if parts == 1:
+                    continue
+                output_file = "{}/{}_{}.txt".format(output_dir, clusters, phy_threads)
+                if path.exists(output_file):
+                    print("Permutation for dataset {} in {} clusters and {} parts is already generated, remove {} file to rerun"
+                          .format(d, clusters, parts, output_file))
+                    continue
 
-            cmd_line = "bin/analysis {} data/{} {} -v".format(parts, d, output_file)
-            print(cmd_line)
-            subprocess.Popen(cmd_line, shell=True).wait()
+                cmd_line = "bin/analysis {} {} data/{} {}".format(clusters, parts, d, output_file)
+                print(cmd_line)
+                return_code = subprocess.Popen(cmd_line, shell=True).wait()
+                if return_code != 0:
+                    print("Process failed: {}".format(return_code))

@@ -68,8 +68,10 @@ class dataset_local {
   char* data;
   char** points_ptr;
 
-  explicit dataset_local(const std::vector<tmp_point>& points, bool shuffle = true) {
-      _size = points.size();
+  dataset_local(const std::vector <tmp_point>& points, bool shuffle = true)
+      : dataset_local(points.size(), points.data(), shuffle) {}
+public:
+  dataset_local(uint size, const tmp_point* points, bool shuffle = true) : _size(size) {
       std::vector<uint> p(_size);
       FOR_N(i, _size) {
           p[i] = i;
@@ -116,7 +118,6 @@ class dataset_local {
       _features++;
   }
 
-public:
   explicit dataset_local(const std::string& name, bool shuffle = true) : dataset_local(load_dataset_from_file(name), shuffle) {}
 
   dataset_local(const dataset_local& other) : _size(other._size), _features(other._features), data_buffer_size(other.data_buffer_size) {

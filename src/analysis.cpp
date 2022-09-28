@@ -39,7 +39,7 @@ struct Individual {
   std::uniform_int_distribution<uint> distribution;
   std::mt19937 gen;
 
-  Individual() : distribution(0, N), gen(create_random_generator()) {
+  Individual() : distribution(0, N - 1), gen(create_random_generator()) {
       group_count.resize(GROUPS);
       permutation.resize(N);
       FOR_N(i, N) {
@@ -412,11 +412,11 @@ bool find_best_swap(std::vector<std::vector<std::vector<ScoreAndIndex>>>& s,
     return true;
 }
 
-void greedy_algorithm(Individual& best) {
+void greedy_algorithm(Individual& best, uint max_epochs) {
     const uint initial_best_score = best.get_score();
 
     uint current_score = initial_best_score;
-    while (true) {
+    FOR_N(ii, max_epochs) {
         auto s = get_preferences(best);
         std::unordered_set<uint> used_indices;
         while (true) {
@@ -445,35 +445,51 @@ void greedy_algorithm(Individual& best) {
 
 
 int main(int argc, char** argv) {
-    assert(argc >= 4);
+    assert(argc >= 5);
 
-    GROUPS = std::atoi(argv[1]);
-    std::string dataset_path = argv[2];
-    std::string output_path = argv[3];
+    int splits = std::atoi(argv[1]);
+    GROUPS = std::atoi(argv[2]);
+    std::string dataset_path = argv[3];
+    std::string output_path = argv[4];
 
     uint fail_tries_threshold = 300;
     uint max_failed_epochs = 100;
 
-
-    my_dataset = new dataset_local(dataset_path, false);
-    N = my_dataset->get_size();
-    F = my_dataset->get_features();
-    PER_PART = N / GROUPS;
     VERBOSE = "-v" == std::string(argv[argc - 1]);
 
-    Individual best = argc == 4 && !VERBOSE || argc > 4 ? Individual(false) : Individual::load(argv[4]);
-    const uint initial_score = best.get_score();
+    Individual result;
+    auto points = load_dataset_from_file(dataset_path);
+    uint per_split = points.size() / splits;
+    for (int s = 0; s < splits; ++s) {
+        N = s == splits - 1 ? points.size() - s * per_split : per_split;
+        uint offset = s * per_split;
+        my_dataset = new dataset_local(N, points.data() + offset, false);
+        F = my_dataset->get_features();
+        PER_PART = N / GROUPS;
 
-    genetic_algorithm(best, fail_tries_threshold, max_failed_epochs);
-    double genetic_improvement = get_improvement(initial_score, best.get_score());
+        Individual best = Individual(false);
+        const uint initial_score = best.get_score();
 
-    greedy_algorithm(best);
-    double greedy_improvement = get_improvement(initial_score, best.get_score());
+        genetic_algorithm(best, fail_tries_threshold, max_failed_epochs);
+        double genetic_improvement = get_improvement(initial_score, best.get_score());
 
-    best.dump(output_path);
+        greedy_algorithm(best, 10);
+        double greedy_improvement = get_improvement(initial_score, best.get_score());
 
-    std::cout << "Optimization completed. Initial score was " << initial_score
-              << " genetic optimized " << genetic_improvement << "%"
-              << " greedy optimized " << greedy_improvement - genetic_improvement << "%"
-              << std::endl;
+        best.apply_swaps();
+        std::copy(best.permutation.begin(), best.permutation.end(), std::back_inserter(result.permutation));
+        for (int i = 0; i < N; ++i) {
+            result.permutation[i + offset] += offset;
+        }
+
+        std::cout << "Optimization completed. Initial score was " << initial_score
+                  << " genetic optimized " << genetic_improvement << "%"
+                  << " greedy optimized " << greedy_improvement - genetic_improvement << "%"
+                  << std::endl;
+
+        delete my_dataset;
+    }
+    result.dump(output_path);
+
+    return 0;
 }
