@@ -207,22 +207,6 @@ struct Individual {
       return true;
   }
 
-  static Individual load(const std::string& file_name) {
-      Individual result;
-      std::ifstream file;
-      file.open(file_name);
-      if (!file.good()) {
-          std::cerr << "Failed to open file " << file_name << "!" << std::endl;
-          return result;
-      }
-      uint i = 0, index;
-      while (file >> index) {
-          result.permutation[i++] = index;
-      }
-      result.calculate_group_count();
-      return result;
-  }
-
   void sort_in_groups() {
       std::vector<int> point_score_buffer(N, -1);
       FOR_N(part, GROUPS) {

@@ -68,7 +68,7 @@ class dataset_local {
   char* data;
   char** points_ptr;
 
-  dataset_local(const std::vector <tmp_point>& points, bool shuffle = true)
+  explicit dataset_local(const std::vector <tmp_point>& points, bool shuffle = true)
       : dataset_local(points.size(), points.data(), shuffle) {}
 public:
   dataset_local(uint size, const tmp_point* points, bool shuffle = true) : _size(size) {
@@ -124,6 +124,24 @@ public:
       data = new char[data_buffer_size];
       std::copy(other.data, other.data + data_buffer_size, data);
       points_ptr = reinterpret_cast<char**>(data);
+  }
+
+  dataset_local(const dataset_local& other, const std::vector<uint>& inverse_permutation) 
+          : _size(other._size), _features(other._features), data_buffer_size(other.data_buffer_size) {
+      assert(_size == inverse_permutation.size());
+      data = new char[data_buffer_size];
+      points_ptr = reinterpret_cast<char**>(data);
+      char* current = data + _size * SIZE_CHAR_PTR;
+      FOR_N(i, _size) {
+          assert(data + _size * SIZE_CHAR_PTR <= current && current < data + data_buffer_size);
+          points_ptr[i] = current;
+          uint index = inverse_permutation[i];
+          data_point point = other[index];
+          char* buffer = other.points_ptr[index];
+          uint length = (SIZE_UINT + SIZE_FP_TYPE) * (point.size + 1);
+          std::copy(buffer, buffer + length, current);
+          current += length;
+      }
   }
 
   inline uint get_size() const {

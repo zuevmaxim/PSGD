@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <memory>
 #include "run_configuration.h"
 
 
@@ -16,8 +17,8 @@ int main(int argc, char** argv) {
     std::string train(argv[1]), test(argv[2]), validate(argv[3]), output(argv[4]);
     const uint numa_nodes = config.get_numa_count();
     dataset train_dataset(numa_nodes, train);
-    dataset test_dataset(numa_nodes, test);
-    dataset validate_dataset(numa_nodes, validate);
+    std::shared_ptr<dataset> test_dataset = std::make_shared<dataset>(numa_nodes, test);
+    std::shared_ptr<dataset> validate_dataset = test == validate ? test_dataset : std::make_shared<dataset>(numa_nodes, validate);
 
     std::istream* in_ptr;
     std::ifstream input_file;
@@ -55,7 +56,7 @@ int main(int argc, char** argv) {
         if (command.empty()) continue;
         if (command == "exit") break;
 
-        experiment_configuration configuration(train_dataset, test_dataset, validate_dataset, output_file);
+        experiment_configuration configuration(train_dataset, *test_dataset, *validate_dataset, output_file);
         if (!configuration.from_string(command)) {
             std::cerr << "Command failed to parse:\n" << command << std::endl;
             continue;

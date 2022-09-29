@@ -16,6 +16,9 @@ typedef std::chrono::high_resolution_clock Time;
 typedef std::chrono::duration<fp_type> fp_sec;
 
 struct experiment_configuration {
+private:
+  std::unique_ptr<dataset> permuted_train{};
+public:
   static bool verbose;
 
   const dataset& train_dataset;
@@ -37,8 +40,25 @@ struct experiment_configuration {
 
   bool from_string(const std::string& command) {
       std::stringstream ss(command);
+      std::string permutation_file;
       ss >> algorithm >> test_repeats >> threads >> cluster_size >> max_epochs >> update_delay >> target_score
-         >> step_size >> step_decay >> block_size;
+         >> step_size >> step_decay >> block_size >> permutation_file;
+      if (!ss.fail() && permutation_file != "none") {
+          uint dataset_size = train_dataset.get_data(0).get_size();
+          std::vector<uint> permutation = load_permutation(permutation_file, dataset_size);
+          if (permutation.size() != dataset_size) {
+              std::cerr << "Dataset size is " << dataset_size
+                        << " but loaded permutation size is " << permutation.size()
+                        << ". Permutation: " << permutation_file
+                        << std::endl;
+              assert(false);
+          }
+          std::vector<uint> inverse_permutation(permutation.size(), 0);
+          FOR_N(i, permutation.size()) {
+              inverse_permutation[permutation[i]] = i;
+          }
+          permuted_train.reset(new dataset(train_dataset, inverse_permutation));
+      }
       return !ss.fail();
   }
 
@@ -49,6 +69,7 @@ struct experiment_configuration {
 
   template<typename T>
   void run_experiments_internal() {
+      const dataset& train = permuted_train ? *permuted_train : train_dataset;
       if (verbose) {
           std::cout << "Start experiments (" << test_repeats << ") with " << algorithm << " algorithm"
                     << " threads=" << threads
@@ -63,8 +84,8 @@ struct experiment_configuration {
 
       thread_pool tp(threads);
 
-      const uint features = train_dataset.get_features();
-      SVMParams svm_params(mu, &train_dataset);
+      const uint features = train.get_features();
+      SVMParams svm_params(mu, &train);
 
       sgd_params params{};
       params.max_epochs = max_epochs;
@@ -83,7 +104,7 @@ struct experiment_configuration {
 
           std::vector<void*> results;
           auto start = Time::now();
-          bool success = run_experiment<T>(train_dataset, validate_dataset, tp, &params, scheme.get(), results);
+          bool success = run_experiment<T>(train, validate_dataset, tp, &params, scheme.get(), results);
           auto end = Time::now();
 
           uint epochs = 0;
@@ -94,7 +115,7 @@ struct experiment_configuration {
           }
           fp_type average_epochs = static_cast<fp_type>(epochs) / threads;
 
-          fp_type train_score = compute_metric(train_dataset.get_data(0), scheme->get_model_vector(0)).to_score();
+          fp_type train_score = compute_metric(train.get_data(0), scheme->get_model_vector(0)).to_score();
           fp_type validate_score = compute_metric(validate_dataset.get_data(0), scheme->get_model_vector(0)).to_score();
           fp_type test_score = compute_metric(test_dataset.get_data(0), scheme->get_model_vector(0)).to_score();
           fp_type time = static_cast<fp_sec>(end - start).count();
@@ -157,6 +178,24 @@ struct experiment_configuration {
       } else {
           std::cerr << "Unexpected algorithm: " << algorithm << std::endl;
       }
+  }
+
+private:
+  static std::vector<uint> load_permutation(const std::string& path, uint size) {
+      std::vector<uint> result;
+      result.reserve(size);
+      std::ifstream file;
+      file.open(path);
+      if (!file.good()) {
+          std::cerr << "Failed to open permutation file " << path << std::endl;
+          return result;
+      }
+      uint index;
+      while (file >> index) {
+          result.push_back(index);
+      }
+      file.close();
+      return result;
   }
 };
 
