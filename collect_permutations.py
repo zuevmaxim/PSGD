@@ -24,7 +24,9 @@ if __name__ == "__main__":
                               .format(d, clusters, parts, output_file))
                         continue
 
-                    cmd_line = "bin/analysis {} {} data/{} {}".format(clusters, parts, d, output_file)
+                    verbose = "-v" in sys.argv
+                    v = " -v" if verbose else ""
+                    cmd_line = "bin/analysis {} {} data/{} {}{}".format(clusters, parts, d, output_file, v)
                     print(cmd_line)
                     return_code = subprocess.Popen(cmd_line, shell=True).wait()
                     if return_code != 0:

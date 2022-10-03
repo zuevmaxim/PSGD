@@ -5,6 +5,7 @@
 #include <cassert>
 #include <deque>
 #include <unordered_set>
+#include <queue>
 
 bool VERBOSE = false;
 uint GROUPS = 0;
@@ -14,21 +15,20 @@ uint PER_PART = 0;
 const dataset_local* my_dataset;
 
 typedef std::pair<uint, uint> Swap;
+typedef std::pair<int, Swap> ScoredSwap;
 
 typedef std::pair<int, uint> ScoreAndIndex;
-
-struct Preference {
-  uint index_in_permutation;
-  uint from_group;
-  uint to_group;
-  int score_diff;
-};
+typedef std::vector<std::vector<std::vector<ScoreAndIndex>>> Preferences;
 
 std::mt19937 create_random_generator() {
     const auto ns = std::chrono::high_resolution_clock::now().time_since_epoch();
     const uint seed = std::chrono::duration_cast<std::chrono::nanoseconds>(ns).count();
     std::mt19937 gen(seed);
     return gen;
+}
+
+static inline uint get_part(uint i) {
+    return std::min(GROUPS - 1, i / PER_PART);
 }
 
 struct Individual {
@@ -89,10 +89,6 @@ struct Individual {
       }
   }
 
-  static inline uint get_part(uint i) {
-      return std::min(GROUPS - 1, i / PER_PART);
-  }
-
   Swap mutate() {
       uint i = distribution(gen), j = distribution(gen);
       uint part_i = get_part(i), part_j = get_part(j);
@@ -141,9 +137,7 @@ struct Individual {
       return total;
   }
 
-  std::vector<Preference> score_possible_groups(uint index_in_permutation) {
-      std::vector<Preference> result;
-      result.reserve(GROUPS - 1);
+  void score_possible_groups(uint index_in_permutation, Preferences& s, int max_score_increase) {
       get_score();
       uint original_index = permutation[index_in_permutation];
       uint my_part = get_part(index_in_permutation);
@@ -161,9 +155,11 @@ struct Individual {
               group_count[my_part][f]++;
               group_count[part][f]--;
           }
-          result.push_back({index_in_permutation, my_part, part, new_features_score - current_features_score});
+          int score_diff = new_features_score - current_features_score;
+          // If score is increasing, do not suggest this point to swap
+          if (score_diff >= max_score_increase) continue;
+          s[my_part][part].emplace_back(score_diff, index_in_permutation);
       }
-      return result;
   }
 
   bool operator<(const Individual& other) const {
@@ -228,9 +224,9 @@ private:
           uint f = point_i.indices[s];
           FOR_N(g, GROUPS) {
               if (g == part) {
-                  score_i += (GROUPS - 1) * group_count[g][f];
+                  score_i += ((int)GROUPS - 1) * (int)group_count[g][f];
               } else {
-                  score_i -= group_count[g][f];
+                  score_i -= (int)group_count[g][f];
               }
           }
       }
@@ -277,14 +273,11 @@ void genetic_algorithm(Individual& best, uint fail_tries_threshold, uint max_fai
         }
         if (failed_tries > fail_tries_threshold) {
             failed_epochs++;
-            if (VERBOSE) {
-                std::cout << failed_tries << " was not enough to generate new mutation " << failed_epochs << "/" << max_failed_epochs << std::endl;
-            }
             if (failed_epochs >= max_failed_epochs) break;
         }
 
         if (VERBOSE) {
-            if ((epoch & 0xfff) == 0xfff) {
+            if ((epoch & 0xffff) == 0xffff) {
                 std::cout << "epoch " << epoch + 1
                           << " best score is " << current_score
                           << " it is " << get_improvement(initial_best_score, current_score) << "% less than initial score"
@@ -296,16 +289,13 @@ void genetic_algorithm(Individual& best, uint fail_tries_threshold, uint max_fai
     best.sort_in_groups();
 }
 
-std::vector<std::vector<std::vector<ScoreAndIndex>>> get_preferences(Individual& best) {
-    std::vector<std::vector<std::vector<ScoreAndIndex>>> s;
-    s.resize(GROUPS);
+// Each cell (i, j) contains a list of elements that want to move from part i to part j.
+// The list is sorted so that elements with most score decrease are located in the end.
+Preferences get_preferences(Individual& best, int max_score_increase) {
+    Preferences s(GROUPS);
     FOR_N(i, GROUPS) s[i].resize(GROUPS);
     FOR_N(i, N) {
-        auto preferences = best.score_possible_groups(i);
-        for (auto& preference: preferences) {
-            if (preference.from_group == preference.to_group) continue;
-            s[preference.from_group][preference.to_group].emplace_back(preference.score_diff, preference.index_in_permutation);
-        }
+        best.score_possible_groups(i, s, max_score_increase);
     }
     FOR_N(i, GROUPS) {
         FOR_N(j, GROUPS) {
@@ -316,110 +306,65 @@ std::vector<std::vector<std::vector<ScoreAndIndex>>> get_preferences(Individual&
 }
 
 
-bool find_best_swap(std::vector<std::vector<std::vector<ScoreAndIndex>>>& s,
-                    std::unordered_set<uint>& used_indices,
-                    std::vector<uint>& chain) {
-    FOR_N(i, GROUPS) {
-        FOR_N(j, GROUPS) {
-            while (!s[i][j].empty() && used_indices.find(s[i][j].back().second) != used_indices.end()) {
-                s[i][j].pop_back();
-            }
-        }
+void best_swap_to_heap(uint i, uint j,
+                       Preferences& s,
+                       std::priority_queue<ScoredSwap, std::vector<ScoredSwap>, std::greater<ScoredSwap>>& best_swaps,
+                       const std::unordered_set<uint>& used_indices) {
+    while (!s[i][j].empty() && used_indices.find(s[i][j].back().second) != used_indices.end()) {
+        s[i][j].pop_back();
     }
-    std::vector<std::vector<std::vector<std::pair<int, std::vector<uint>>>>> d(GROUPS - 1);
-    int INF = 1e6;
-    FOR_N(r, GROUPS - 1) {
-        d[r].resize(GROUPS);
-        FOR_N(i, GROUPS) {
-            d[r][i].resize(GROUPS, {INF, {}});
-            if (r > 0) continue;
-            FOR_N(j, GROUPS) {
-                if (i == j) continue;
-                if (s[i][j].empty()) continue;
-                d[r][i][j] = {s[i][j].back().first, {}};
-            }
-        }
+    while (!s[j][i].empty() && used_indices.find(s[j][i].back().second) != used_indices.end()) {
+        s[j][i].pop_back();
     }
-    for (uint r = 1; r < GROUPS - 1; ++r) {
-        FOR_N(i, GROUPS) {
-            FOR_N(j, GROUPS) {
-                if (i == j) continue;
-                d[r][i][j] = d[r - 1][i][j];
-                FOR_N(k, GROUPS) {
-                    if (k == i || k == j) continue;
-                    if (s[i][k].empty()) continue;
-                    if (d[r - 1][k][j].first == INF) continue;
-                    if (std::find(d[r - 1][k][j].second.begin(), d[r - 1][k][j].second.end(), i) != d[r - 1][k][j].second.end()) {
-                        continue;
-                    }
-                    int candidate_score = s[i][k].back().first + d[r - 1][k][j].first;
-                    if (d[r][i][j].first == INF || candidate_score < d[r][i][j].first) {
-                        d[r][i][j].first = candidate_score;
-                        d[r][i][j].second = d[r - 1][k][j].second;
-                        d[r][i][j].second.push_back(k);
-                    }
-                }
-            }
-        }
-    }
-    int min_score = INF;
-    uint gi, gj;
-    uint R = GROUPS - 2;
-    FOR_N(i, GROUPS) {
-        FOR_N(j, GROUPS) {
-            if (i == j) continue;
-            if (d[R][i][j].first == INF) continue;
-            if (s[j][i].empty()) continue;
-            if (s[j][i].back().first + d[R][i][j].first < min_score) {
-                gi = i;
-                gj = j;
-                min_score = s[j][i].back().first + d[R][i][j].first;
-            }
-        }
-    }
-
-    if (min_score == INF || min_score >= 0) return false;
-    chain.clear();
-    std::vector<uint> group_seq;
-    group_seq.reserve(2 + d[R][gi][gj].second.size());
-    group_seq.push_back(gi);
-    for (uint i = d[R][gi][gj].second.size(); i-- > 0;) {
-        group_seq.push_back(d[R][gi][gj].second[i]);
-    }
-    group_seq.push_back(gj);
-    FOR_N(k, group_seq.size()) {
-        uint i = k > 0 ? group_seq[k - 1] : group_seq[group_seq.size() - 1];
-        uint j = group_seq[k];
-        chain.push_back(s[i][j].back().second);
-    }
-
-    return true;
+    if (s[i][j].empty()) return;
+    if (s[j][i].empty()) return;
+    const ScoreAndIndex& i_to_j = s[i][j].back();
+    const ScoreAndIndex& j_to_i = s[j][i].back();
+    int score = i_to_j.first + j_to_i.first;
+    // The goal is to decrease score the most, so only negative diff is applied.
+    if (score >= 0) return;
+    best_swaps.push({score, {i_to_j.second, j_to_i.second}});
 }
 
-void greedy_algorithm(Individual& best, uint max_epochs) {
+void greedy_algorithm(Individual& best, uint max_epochs, int max_score_increase) {
     const uint initial_best_score = best.get_score();
 
-    uint current_score = initial_best_score;
+    uint best_score = initial_best_score;
     FOR_N(ii, max_epochs) {
-        auto s = get_preferences(best);
+        auto s = get_preferences(best, max_score_increase);
+        std::priority_queue<ScoredSwap, std::vector<ScoredSwap>, std::greater<ScoredSwap>> best_swaps;
         std::unordered_set<uint> used_indices;
-        while (true) {
-            std::vector<uint> chain;
-            if (!find_best_swap(s, used_indices, chain)) break;
-            FOR_N(i, chain.size()) {
-                used_indices.insert(chain[i]);
-                if (i >= 1) {
-                    best.swaps.emplace_back(chain[0], chain[i]);
-                }
+        FOR_N(i, GROUPS) {
+            for (uint j = i + 1; j < GROUPS; ++j) {
+                best_swap_to_heap(i, j, s, best_swaps, used_indices);
             }
         }
-        if (best.swaps.empty()) break;
         uint current_best_score = best.get_score();
-        if (current_best_score >= current_score) break;
-        current_score = current_best_score;
+        while (!best_swaps.empty()) {
+            ScoredSwap best_swap = best_swaps.top();
+            best_swaps.pop();
+            uint i_elem = best_swap.second.first;
+            uint j_elem = best_swap.second.second;
+            used_indices.insert(i_elem);
+            used_indices.insert(j_elem);
+            best.swaps.emplace_back(best_swap.second);
+            best_swap_to_heap(get_part(i_elem), get_part(j_elem), s, best_swaps, used_indices);
+            uint current_score = best.get_score();
+            if (current_score > current_best_score) {
+                best.revert_mutation(best_swap.second);
+                current_score = best.get_score();
+                assert(current_score == current_best_score);
+            }
+            assert(current_score <= current_best_score);
+            current_best_score = current_score;
+        }
+        assert(current_best_score == best.get_score());
+        assert(current_best_score <= best_score);
+        if (current_best_score == best_score) break;
+        best_score = current_best_score;
         if (VERBOSE) {
             std::cout << "best score is " << current_best_score
-                      << " it is " << get_improvement(initial_best_score, current_score) << "% less than initial score"
+                      << " it is " << get_improvement(initial_best_score, current_best_score) << "% less than initial score"
                       << std::endl;
         }
     }
@@ -437,7 +382,7 @@ int main(int argc, char** argv) {
     std::string output_path = argv[4];
 
     uint fail_tries_threshold = 300;
-    uint max_failed_epochs = 100;
+    uint max_failed_epochs = 25;
 
     VERBOSE = "-v" == std::string(argv[argc - 1]);
 
@@ -457,7 +402,7 @@ int main(int argc, char** argv) {
         genetic_algorithm(best, fail_tries_threshold, max_failed_epochs);
         double genetic_improvement = get_improvement(initial_score, best.get_score());
 
-        greedy_algorithm(best, 10);
+        greedy_algorithm(best, 3, 50);
         double greedy_improvement = get_improvement(initial_score, best.get_score());
 
         best.apply_swaps();
