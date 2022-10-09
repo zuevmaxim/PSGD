@@ -136,7 +136,8 @@ public:
               << time << ',' << train_score << ',' << validate_score << ',' << test_score << ','
               << average_epochs << ',' << epoch_time << ','
               << step_size << ',' << step_decay << ',' << update_delay << ','
-              << target_score << ',' << block_size
+              << target_score << ',' << block_size << ','
+              << (permuted_train ? 1 : 0)
               << std::endl;
 
           if (!verbose) std::cout << (success ? '.' : '!') << std::flush;
@@ -158,13 +159,15 @@ public:
                 << "Average results:"
                 << " algorithm=" << algorithm
                 << " threads=" << threads
+                << (algorithm == "HogWild" ? "" : " cluster_size=" + std::to_string(cluster_size))
                 << " block_size=" << block_size
                 << " step_decay=" << step_decay
-                << " update_delay=" << update_delay
+                << (algorithm == "HogWild" ? "" : " update_delay=" + std::to_string(update_delay))
                 << " convergence=" << total_tests
                 << " time=" << total_time
                 << " epochs=" << total_epochs
                 << " epoch_time=" << total_epoch_time
+                << " permuted=" << (permuted_train ? 1 : 0)
                 << std::endl;
   }
 

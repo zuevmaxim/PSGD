@@ -11,6 +11,7 @@ KEY_PATH=
 rsync -avhP \
   -e "ssh -i $KEY_PATH" \
   --include 'src' \
+  --include 'permutations' \
   --exclude 'sync.sh' \
   --exclude '.idea' \
   --exclude 'src/numa.h' \
