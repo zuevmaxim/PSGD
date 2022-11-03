@@ -41,7 +41,7 @@ namespace vectors {
       const uint size = point.size;
       const uint* const __restrict__ indices = point.indices;
       const fp_type* const __restrict__ b_data = point.data;
-      FOR_N(i, size) {
+      FAST_FOR(i, size) {
           const uint index = indices[i];
           const fp_type b_val = b_data[i];
           const fp_type a_val = a_data[index];
@@ -56,7 +56,7 @@ namespace vectors {
       const uint size = point.size;
       const uint* const __restrict__ indices = point.indices;
       const fp_type* const __restrict__ b_data = point.data;
-      FOR_N(i, size) {
+      FAST_FOR(i, size) {
           const uint index = indices[i];
           const fp_type b_val = b_data[i];
           a_data[index] += s * b_val;
@@ -83,7 +83,7 @@ namespace svm {
       const uint* const __restrict__ indices = point.indices;
       const fp_type scalar = step * args->mu;
       const uint size = point.size;
-      FOR_N(i, size) {
+      FAST_FOR(i, size) {
           const uint j = indices[i];
           const uint deg = degrees[j];
           vals[j] *= 1 - scalar / deg;
