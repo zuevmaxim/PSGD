@@ -50,7 +50,7 @@ public:
         validate(validate),
         threads(threads),
         barrier(new spin_barrier(threads)),
-        metric(new metric_summary()),
+        metric(new metric_summary[params->max_epochs]),
         perm(new permutation(nodes)),
         success(new bool(false)),
         copy(false),
@@ -75,7 +75,7 @@ public:
           return;
       }
       delete barrier;
-      delete metric;
+      delete[] metric;
       delete perm;
       delete success;
   }
@@ -135,19 +135,16 @@ void* thread_task(void* args, const uint thread_id) {
         task.params.step *= task.params.step_decay;
         cluster_perm = cluster_perm->gen_next();
 
-        task.metric->zero();
-        task.barrier->wait();
         const auto summary = compute_metric(validate, w, valid_start, valid_end);
-        task.metric->plus(summary);
+        task.metric[e].plus(summary);
         task.barrier->wait();
-        const fp_type current_score = task.metric->to_score();
+        const fp_type current_score = task.metric[e].to_score();
         if (unlikely(current_score >= target_score)) {
             *task.success = true;
             return new uint(e + 1);
         }
         perm_node::shuffle(blocks_perm.data, blocks_per_thread);
     }
-    task.metric->zero();
     return new uint(n);
 }
 

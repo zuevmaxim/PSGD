@@ -125,13 +125,6 @@ struct metric_summary {
       false_negative.fetch_add(x.false_negative.load());
   }
 
-  void zero() {
-      true_positive.store(0);
-      true_negative.store(0);
-      false_positive.store(0);
-      false_negative.store(0);
-  }
-
   uint total() const {
       return true_positive.load() + true_negative.load() + false_positive.load() + false_negative.load();
   }
