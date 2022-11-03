@@ -79,6 +79,7 @@ public:
                     << " step_decay=" << step_decay
                     << (algorithm == "HogWild" ? "" : " update_delay=" + std::to_string(update_delay))
                     << " block_size=" << block_size
+                    << " permuted=" << (permuted_train ? 1 : 0)
                     << std::endl;
       }
 
@@ -161,6 +162,7 @@ public:
                 << " threads=" << threads
                 << (algorithm == "HogWild" ? "" : " cluster_size=" + std::to_string(cluster_size))
                 << " block_size=" << block_size
+                << " step_size=" << step_size
                 << " step_decay=" << step_decay
                 << (algorithm == "HogWild" ? "" : " update_delay=" + std::to_string(update_delay))
                 << " convergence=" << total_tests
