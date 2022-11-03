@@ -71,7 +71,7 @@ use_permutation = [False, True]
 def get_cluster_sizes(algorithm, threads):
     if algorithm == "HogWild":
         return [threads]
-    return [y for y in [threads // x for x in [2, 4, 8]] if y >= 1]
+    return [threads // x for x in [2, 4, 8] if threads // x >= 1]
 
 
 def generate_update_delays(algorithm, nweights):
@@ -165,6 +165,8 @@ if __name__ == "__main__":
         verbose = "-v" in sys.argv
         v = " -v" if verbose else ""
         cmd_line = "bin/svm data/{} data/{}.t data/{}.t {} {}{}".format(d, d, d, output_file, input_path, v)
+        if "-d" in sys.argv:
+            cmd_line = "perf record --call-graph dwarf " + cmd_line
         print(cmd_line)
         if not is_dry_run():
             return_code = subprocess.Popen(cmd_line, shell=True).wait()
