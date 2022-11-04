@@ -112,10 +112,7 @@ struct metric_summary {
         false_negative(other.false_negative.load()) {}
 
   fp_type to_score() const {
-      const uint tp = true_positive.load();
-      const fp_type precision = static_cast<fp_type>(tp) / (tp + false_positive.load());
-      const fp_type recall = static_cast<fp_type>(tp) / (tp + false_negative.load());
-      return 2 * precision * recall / (precision + recall);
+      return (true_positive.load() + true_negative.load()) / static_cast<fp_type>(total());
   }
 
   void plus(const metric_summary& x) {
