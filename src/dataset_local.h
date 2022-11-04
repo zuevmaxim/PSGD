@@ -41,7 +41,7 @@ std::vector<tmp_point> load_dataset_from_file(const std::string& name) {
         tmp_point p;
         std::stringstream ss(str);
         fp_type x{};
-        int index{};
+        int index{}, old_index = -1;
         char c{};
         ss >> x;
         p.label = (x == 1.0) ? 1.0 : -1.0;
@@ -51,6 +51,10 @@ std::vector<tmp_point> load_dataset_from_file(const std::string& name) {
                 continue;
             }
             index -= 1;
+            assert(index >= 0);
+            assert(old_index == -1 || index > old_index);
+            old_index = index;
+            assert(x != 0);
             p.indices.push_back(index);
             p.data.push_back(x);
         }
