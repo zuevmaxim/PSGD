@@ -81,18 +81,10 @@ struct experiment_configuration {
       FOR_N(run, test_repeats) {
           std::unique_ptr<T> scheme(create_scheme<T>(features, &svm_params));
 
-          std::vector<void*> results;
+          fp_type average_epochs;
           auto start = Time::now();
-          bool success = run_experiment<T>(train_dataset, validate_dataset, tp, &params, scheme.get(), results);
+          bool success = run_experiment<T>(train_dataset, validate_dataset, tp, &params, scheme.get(), average_epochs);
           auto end = Time::now();
-
-          uint epochs = 0;
-          FOR_N(i, threads) {
-              auto e = reinterpret_cast<uint*>(results[i]);
-              epochs += *e;
-              delete e;
-          }
-          fp_type average_epochs = static_cast<fp_type>(epochs) / threads;
 
           fp_type train_score = compute_metric(train_dataset.get_data(0), scheme->get_model_vector(0)).to_score();
           fp_type validate_score = compute_metric(validate_dataset.get_data(0), scheme->get_model_vector(0)).to_score();
@@ -137,9 +129,11 @@ struct experiment_configuration {
                 << "Average results:"
                 << " algorithm=" << algorithm
                 << " threads=" << threads
+                << (algorithm == "HogWild" ? "" : " cluster_size=" + std::to_string(cluster_size))
                 << " block_size=" << block_size
+                << " step_size=" << step_size
                 << " step_decay=" << step_decay
-                << " update_delay=" << update_delay
+                << (algorithm == "HogWild" ? "" : " update_delay=" + std::to_string(update_delay))
                 << " convergence=" << total_tests
                 << " time=" << total_time
                 << " epochs=" << total_epochs

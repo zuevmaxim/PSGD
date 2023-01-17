@@ -55,6 +55,10 @@ private:
 
   static void* thread_run(void* data) {
       auto* td = reinterpret_cast<thread_data*>(data);
+#ifdef __linux__
+      std::string name = "Thread " + std::to_string(td->id);
+      pthread_setname_np(pthread_self(), name.c_str());
+#endif
       td->tp->thread_loop(td->id);
       return nullptr;
   }

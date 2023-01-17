@@ -33,6 +33,7 @@ public:
   spin_barrier* const barrier;
   metric_summary* const metric;
   permutation* const perm;
+  bool* const success;
   const bool copy;
   const uint blocks_per_thread;
 
@@ -49,8 +50,9 @@ public:
         validate(validate),
         threads(threads),
         barrier(new spin_barrier(threads)),
-        metric(new metric_summary()),
+        metric(new metric_summary[params->max_epochs]),
         perm(new permutation(nodes)),
+        success(new bool(false)),
         copy(false),
         blocks_per_thread(std::max(1u, train.get_data(0).get_size() / (params->block_size * threads))) {}
 
@@ -63,6 +65,7 @@ public:
         barrier(other.barrier),
         metric(other.metric),
         perm(other.perm),
+        success(other.success),
         copy(true),
         blocks_per_thread(other.blocks_per_thread) {}
 
@@ -72,8 +75,9 @@ public:
           return;
       }
       delete barrier;
-      delete metric;
+      delete[] metric;
       delete perm;
+      delete success;
   }
 };
 
@@ -119,7 +123,7 @@ void* thread_task(void* args, const uint thread_id) {
         FOR_N(block_index, blocks_per_thread) {
             const uint block = blocks_perm[block_index] + start_block;
             const uint start = block_size * block;
-            const uint end = unlikely(block + 1 == total_blocks) ? train_size : start + block_size;
+            const uint end = block + 1 == total_blocks ? train_size : start + block_size;
 
             // Update cycle must avoid any unnecessary NUMA communication
             for (uint i = start; i < end; ++i) {
@@ -131,18 +135,16 @@ void* thread_task(void* args, const uint thread_id) {
         task.params.step *= task.params.step_decay;
         cluster_perm = cluster_perm->gen_next();
 
-        task.metric->zero();
-        task.barrier->wait();
         const auto summary = compute_metric(validate, w, valid_start, valid_end);
-        task.metric->plus(summary);
+        task.metric[e].plus(summary);
         task.barrier->wait();
-        const fp_type current_score = task.metric->to_score();
+        const fp_type current_score = task.metric[e].to_score();
         if (unlikely(current_score >= target_score)) {
+            *task.success = true;
             return new uint(e + 1);
         }
         perm_node::shuffle(blocks_perm.data, blocks_per_thread);
     }
-    task.metric->zero();
     return new uint(n);
 }
 
@@ -153,13 +155,20 @@ bool run_experiment(
     thread_pool& tp,
     sgd_params* params,
     T* data_scheme,
-    std::vector<void*>& results
+    fp_type& epochs
 ) {
     Task<T> task(tp.get_numa_count(), params, data_scheme, train, validate, tp.get_size());
 
-    results = tp.execute(thread_task<T>, &task);
+    auto results = tp.execute(thread_task<T>, &task);
+    epochs = 0;
+    FOR_N(i, tp.get_size()) {
+        uint* res = reinterpret_cast<uint*>(results[i]);
+        epochs += *res;
+        delete res;
+    }
+    epochs /= tp.get_size();
 
-    return task.metric->total() > 0;
+    return *task.success;
 }
 
 

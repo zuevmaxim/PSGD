@@ -41,7 +41,7 @@ namespace vectors {
       const uint size = point.size;
       const uint* const __restrict__ indices = point.indices;
       const fp_type* const __restrict__ b_data = point.data;
-      FOR_N(i, size) {
+      FAST_FOR(i, size) {
           const uint index = indices[i];
           const fp_type b_val = b_data[i];
           const fp_type a_val = a_data[index];
@@ -56,7 +56,7 @@ namespace vectors {
       const uint size = point.size;
       const uint* const __restrict__ indices = point.indices;
       const fp_type* const __restrict__ b_data = point.data;
-      FOR_N(i, size) {
+      FAST_FOR(i, size) {
           const uint index = indices[i];
           const fp_type b_val = b_data[i];
           a_data[index] += s * b_val;
@@ -83,7 +83,7 @@ namespace svm {
       const uint* const __restrict__ indices = point.indices;
       const fp_type scalar = step * args->mu;
       const uint size = point.size;
-      FOR_N(i, size) {
+      FAST_FOR(i, size) {
           const uint j = indices[i];
           const uint deg = degrees[j];
           vals[j] *= 1 - scalar / deg;
@@ -112,10 +112,7 @@ struct metric_summary {
         false_negative(other.false_negative.load()) {}
 
   fp_type to_score() const {
-      const uint tp = true_positive.load();
-      const fp_type precision = static_cast<fp_type>(tp) / (tp + false_positive.load());
-      const fp_type recall = static_cast<fp_type>(tp) / (tp + false_negative.load());
-      return 2 * precision * recall / (precision + recall);
+      return (true_positive.load() + true_negative.load()) / static_cast<fp_type>(total());
   }
 
   void plus(const metric_summary& x) {
@@ -123,13 +120,6 @@ struct metric_summary {
       true_negative.fetch_add(x.true_negative.load());
       false_positive.fetch_add(x.false_positive.load());
       false_negative.fetch_add(x.false_negative.load());
-  }
-
-  void zero() {
-      true_positive.store(0);
-      true_negative.store(0);
-      false_positive.store(0);
-      false_negative.store(0);
   }
 
   uint total() const {

@@ -66,10 +66,10 @@ stepdecay_per_dataset = {
 }
 
 
-def get_clusters(algorithm, threads):
+def get_cluster_sizes(algorithm, threads):
     if algorithm == "HogWild":
         return [threads]
-    return [y for y in [threads // x for x in [2, 4, 8]] if y >= 1]
+    return [threads // x for x in [2, 4, 8] if threads // x >= 1]
 
 
 def generate_update_delays(algorithm, nweights):
@@ -137,20 +137,19 @@ if __name__ == "__main__":
         for algorithm in algorithms:
             for thread in nthreads:
                 phy_threads = min(thread, phy_cores)
-                clusters = get_clusters(algorithm, phy_threads)
-                for cluster in clusters:
-                    cluster_count = phy_threads // cluster
-                    if (phy_threads % cluster) != 0:
+                for cluster_size in get_cluster_sizes(algorithm, phy_threads):
+                    clusters = phy_threads // cluster_size
+                    if (phy_threads % cluster_size) != 0:
                         continue
                     epochs = get_epochs(d, max_iterations[algorithm])
-                    epochs = get_effective_epochs(algorithm, cluster_count, epochs)
-                    for update_delay in generate_update_delays(algorithm, cluster_count):
+                    epochs = get_effective_epochs(algorithm, clusters, epochs)
+                    for update_delay in generate_update_delays(algorithm, clusters):
                         accuracy = target_accuracy[d]
                         step_size = maxstepsize[d]
-                        for step_decay in create_step_decay_trials(d, algorithm, cluster_count):
+                        for step_decay in create_step_decay_trials(d, algorithm, clusters):
                             for bs in block_size:
                                 input_file.write("{} {} {} {} {} {} {} {} {} {}\n".format(
-                                    algorithm, test_repeats, thread, cluster, epochs,
+                                    algorithm, test_repeats, thread, cluster_size, epochs,
                                     update_delay, accuracy, step_size, step_decay, bs
                                 ))
         input_file.write("exit\n")
@@ -158,9 +157,13 @@ if __name__ == "__main__":
         verbose = "-v" in sys.argv
         v = " -v" if verbose else ""
         cmd_line = "bin/svm data/{} data/{}.t data/{}.t {} {}{}".format(d, d, d, output_file, input_path, v)
+        if "-d" in sys.argv:
+            cmd_line = "perf record --call-graph dwarf " + cmd_line
         print(cmd_line)
         if not is_dry_run():
-            subprocess.Popen(cmd_line, shell=True).wait()
+            return_code = subprocess.Popen(cmd_line, shell=True).wait()
+            if return_code != 0:
+                print("Process failed: {}".format(return_code))
         else:
             print("*** This is a dry run. No results will be produced. ***")
         print()
