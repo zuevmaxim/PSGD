@@ -5,6 +5,8 @@ import sys
 import time
 from subprocess import check_call
 
+from plot_data import plot_data
+
 test_repeats = 10
 phy_cores = 16
 datasets = [
@@ -46,7 +48,7 @@ target_accuracy = {
     "a8a": 0.845374,
     "covtype": 0.76291,
     "webspam": 0.92700,
-    "rcv1": 0.978028,
+    "rcv1": 0.97713,
     "epsilon": 0.89740,
     "news20": 0.96425,
     "url": 0.99,
@@ -127,7 +129,7 @@ def get_effective_epochs(a, c, e):
 
 
 if __name__ == "__main__":
-    output_dir = "results/svm_" + time.strftime("%m%d-%H%M%S")
+    output_dir = "results/svm_" + time.strftime("%y%m%d-%H%M%S")
     check_call("mkdir -p {}/".format(output_dir), shell=True)
 
     for d in datasets:
@@ -167,3 +169,4 @@ if __name__ == "__main__":
         else:
             print("*** This is a dry run. No results will be produced. ***")
         print()
+        plot_data(d, output_file)
