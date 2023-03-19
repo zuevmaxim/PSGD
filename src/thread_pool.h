@@ -20,10 +20,9 @@ struct thread_data {
   uint id;
 };
 
-typedef void* tp_task_return_t;
 typedef void* tp_task_internal_args_t;
 
-typedef tp_task_return_t(* tp_task_t)(tp_task_internal_args_t, unsigned);
+typedef void(* tp_task_t)(tp_task_internal_args_t, unsigned);
 
 class thread_pool {
 private:
@@ -31,7 +30,6 @@ private:
   uint max_numa_node{};
   std::vector<pthread_t> threads;
   std::vector<thread_data> thread_datas;
-  std::vector<tp_task_return_t> results;
   std::atomic<bool> stop{};
   barrier_t ready;
   barrier_t finished;
@@ -48,7 +46,7 @@ private:
           auto a_task = task.load();
           auto the_args = args.load();
           assert(a_task != nullptr);
-          results[thread_id] = a_task(the_args, thread_id);
+          a_task(the_args, thread_id);
           barrier_wait(&finished);
       }
   }
@@ -67,7 +65,6 @@ public:
   explicit thread_pool(uint size) : size(size) {
       threads.resize(size);
       thread_datas.resize(size);
-      results.resize(size);
       FOR_N(i, size) {
           thread_datas[i].id = i;
           thread_datas[i].tp = this;
@@ -101,14 +98,13 @@ public:
       return max_numa_node + 1;
   }
 
-  std::vector<tp_task_return_t> execute(tp_task_t hook, tp_task_internal_args_t hook_args) {
+  void execute(tp_task_t hook, tp_task_internal_args_t hook_args) {
       task.store(hook);
       args.store(hook_args);
       barrier_wait(&ready);
       barrier_wait(&finished);
       task.store(NULL);
       args.store(NULL);
-      return results;
   }
 };
 

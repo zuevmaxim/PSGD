@@ -22,6 +22,7 @@ struct experiment_configuration {
   const dataset& test_dataset;
   const dataset& validate_dataset;
   std::ostream& output;
+  std::ostream& metrics_output;
 
   std::string algorithm;
   unsigned test_repeats = 1;
@@ -33,7 +34,8 @@ struct experiment_configuration {
   experiment_configuration(const dataset& train_dataset,
                            const dataset& test_dataset,
                            const dataset& validate_dataset,
-                           std::ostream& output) : train_dataset(train_dataset), test_dataset(test_dataset), validate_dataset(validate_dataset), output(output) {}
+                           std::ostream& output,
+                           std::ostream& metrics_output) : train_dataset(train_dataset), test_dataset(test_dataset), validate_dataset(validate_dataset), output(output), metrics_output(metrics_output) {}
 
   bool from_string(const std::string& command) {
       std::stringstream ss(command);
@@ -81,23 +83,24 @@ struct experiment_configuration {
       FOR_N(run, test_repeats) {
           std::unique_ptr<T> scheme(create_scheme<T>(features, &svm_params));
 
-          fp_type average_epochs;
           auto start = Time::now();
-          bool success = run_experiment<T>(train_dataset, validate_dataset, tp, &params, scheme.get(), average_epochs);
+          auto task = run_experiment<T>(train_dataset, validate_dataset, tp, &params, scheme.get());
           auto end = Time::now();
+          bool success = *task.success;
+          uint epochs = *task.epochs;
 
           fp_type train_score = compute_metric(train_dataset.get_data(0), scheme->get_model_vector(0)).to_score();
           fp_type validate_score = compute_metric(validate_dataset.get_data(0), scheme->get_model_vector(0)).to_score();
           fp_type test_score = compute_metric(test_dataset.get_data(0), scheme->get_model_vector(0)).to_score();
           fp_type time = static_cast<fp_sec>(end - start).count();
-          fp_type epoch_time = time / average_epochs;
+          fp_type epoch_time = time / epochs;
 
           if (verbose) {
               std::cout << std::fixed << std::setprecision(5) << std::setfill(' ')
                         << "Experiment " << run + 1 << "/" << test_repeats
                         << " completed with " << (success ? "SUCCESS" : "FAIL")
                         << " time=" << time
-                        << " epochs=" << average_epochs
+                        << " epochs=" << epochs
                         << " per_epoch=" << epoch_time
                         << std::endl;
           }
@@ -105,16 +108,23 @@ struct experiment_configuration {
           output
               << algorithm << ',' << threads << ',' << cluster_size << ',' << (success ? 1 : 0) << ','
               << time << ',' << train_score << ',' << validate_score << ',' << test_score << ','
-              << average_epochs << ',' << epoch_time << ','
+              << epochs << ',' << epoch_time << ','
               << step_size << ',' << step_decay << ',' << update_delay << ','
               << target_score << ',' << block_size
               << std::endl;
+
+          if (success) {
+              FOR_N(i, epochs) {
+                  metrics_output << algorithm << ',' << threads << ',' << cluster_size << ',' << i << ',' << task.metric.get()[i].to_score() << '\n';
+              }
+              metrics_output << std::flush;
+          }
 
           if (!verbose) std::cout << (success ? '.' : '!') << std::flush;
           if (!success) continue;
 
           total_time += time;
-          total_epochs += average_epochs;
+          total_epochs += epochs;
           total_epoch_time += epoch_time;
           total_tests++;
       }

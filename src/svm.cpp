@@ -42,6 +42,12 @@ int main(int argc, char** argv) {
         std::cerr << "Error opening output file " << output << std::endl;
         exit(3);
     }
+    std::ofstream output_metrics_file;
+    output_metrics_file.open(output + ".metric");
+    if (!output_metrics_file.good()) {
+        std::cerr << "Error opening output file " << output + ".metric" << std::endl;
+        exit(3);
+    }
 
 
     if (argc > 6 && strcmp("-v", argv[6]) == 0) {
@@ -57,7 +63,7 @@ int main(int argc, char** argv) {
         if (command.empty()) continue;
         if (command == "exit") break;
 
-        experiment_configuration configuration(train_dataset, *test_dataset, *validate_dataset, output_file);
+        experiment_configuration configuration(train_dataset, *test_dataset, *validate_dataset, output_file, output_metrics_file);
         if (!configuration.from_string(command)) {
             std::cerr << "Command failed to parse:\n" << command << std::endl;
             continue;

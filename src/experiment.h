@@ -30,10 +30,11 @@ public:
   const dataset& train;
   const dataset& validate;
   const uint threads;
-  spin_barrier* const barrier;
-  metric_summary* const metric;
-  permutation* const perm;
-  bool* const success;
+  const std::shared_ptr<spin_barrier> barrier;
+  const std::shared_ptr<metric_summary> metric;
+  const std::shared_ptr<permutation> perm;
+  const std::shared_ptr<bool> success;
+  const std::shared_ptr<uint> epochs;
   const bool copy;
   const uint blocks_per_thread;
 
@@ -50,9 +51,10 @@ public:
         validate(validate),
         threads(threads),
         barrier(new spin_barrier(threads)),
-        metric(new metric_summary[params->max_epochs]),
+        metric(new metric_summary[params->max_epochs], std::default_delete<metric_summary[]>()),
         perm(new permutation(nodes)),
         success(new bool(false)),
+        epochs(new uint(0)),
         copy(false),
         blocks_per_thread(std::max(1u, train.get_data(0).get_size() / (params->block_size * threads))) {}
 
@@ -66,23 +68,19 @@ public:
         metric(other.metric),
         perm(other.perm),
         success(other.success),
+        epochs(other.epochs),
         copy(true),
         blocks_per_thread(other.blocks_per_thread) {}
 
   ~Task() {
       if (copy) {
           delete data_scheme;
-          return;
       }
-      delete barrier;
-      delete[] metric;
-      delete perm;
-      delete success;
   }
 };
 
 template<typename T>
-void* thread_task(void* args, const uint thread_id) {
+void thread_task(void* args, const uint thread_id) {
     Task<T> task = *reinterpret_cast<Task<T>*>(args);
 
     const uint node = config.get_node_for_thread(thread_id);
@@ -136,39 +134,24 @@ void* thread_task(void* args, const uint thread_id) {
         cluster_perm = cluster_perm->gen_next();
 
         const auto summary = compute_metric(validate, w, valid_start, valid_end);
-        task.metric[e].plus(summary);
+        task.metric.get()[e].plus(summary);
         task.barrier->wait();
-        const fp_type current_score = task.metric[e].to_score();
+        const fp_type current_score = task.metric.get()[e].to_score();
         if (unlikely(current_score >= target_score)) {
             *task.success = true;
-            return new uint(e + 1);
+            *task.epochs = e + 1;
+            return;
         }
         perm_node::shuffle(blocks_perm.data, blocks_per_thread);
     }
-    return new uint(n);
+    *task.epochs = n;
 }
 
 template<typename T>
-bool run_experiment(
-    const dataset& train,
-    const dataset& validate,
-    thread_pool& tp,
-    sgd_params* params,
-    T* data_scheme,
-    fp_type& epochs
-) {
+Task<T> run_experiment(const dataset& train, const dataset& validate, thread_pool& tp, sgd_params* params, T* data_scheme) {
     Task<T> task(tp.get_numa_count(), params, data_scheme, train, validate, tp.get_size());
-
-    auto results = tp.execute(thread_task<T>, &task);
-    epochs = 0;
-    FOR_N(i, tp.get_size()) {
-        uint* res = reinterpret_cast<uint*>(results[i]);
-        epochs += *res;
-        delete res;
-    }
-    epochs /= tp.get_size();
-
-    return *task.success;
+    tp.execute(thread_task<T>, &task);
+    return task;
 }
 
 
