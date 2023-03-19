@@ -8,13 +8,13 @@ sns.set(style='whitegrid')
 
 
 def read__metrics_df(results_path):
-    columns = ["threads", "epoch", "accuracy"]
+    columns = ["algorithm", "threads", "cluster_count", "epoch", "accuracy"]
     df = pd.read_csv(results_path, header=None, names=columns)
     return df
 
 
 def read_df(results_path):
-    columns = ["algorithm", "threads", "cluster_size", "converge", "time", "train_acc", "validate_acc",
+    columns = ["algorithm", "threads", "cluster_count", "converge", "time", "train_acc", "validate_acc",
                "test_acc", "epochs", "epoch_time", "step_size", "step_decay", "update_delay", "target_acc",
                "block_size"]
     df = pd.read_csv(results_path, header=None, names=columns)

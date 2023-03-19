@@ -51,10 +51,11 @@ struct experiment_configuration {
 
   template<typename T>
   void run_experiments_internal() {
+      uint cluster_count = std::min(threads, config.get_phy_cpus()) / cluster_size;
       if (verbose) {
           std::cout << "Start experiments (" << test_repeats << ") with " << algorithm << " algorithm"
                     << " threads=" << threads
-                    << (algorithm == "HogWild" ? "" : " cluster_size=" + std::to_string(cluster_size))
+                    << (algorithm == "HogWild" ? "" : " cluster_count=" + std::to_string(cluster_count))
                     << " target_score=" << target_score
                     << " step_size=" << step_size
                     << " step_decay=" << step_decay
@@ -106,7 +107,7 @@ struct experiment_configuration {
           }
 
           output
-              << algorithm << ',' << threads << ',' << cluster_size << ',' << (success ? 1 : 0) << ','
+              << algorithm << ',' << threads << ',' << cluster_count << ',' << (success ? 1 : 0) << ','
               << time << ',' << train_score << ',' << validate_score << ',' << test_score << ','
               << epochs << ',' << epoch_time << ','
               << step_size << ',' << step_decay << ',' << update_delay << ','
@@ -115,7 +116,7 @@ struct experiment_configuration {
 
           if (success) {
               FOR_N(i, epochs) {
-                  metrics_output << algorithm << ',' << threads << ',' << cluster_size << ',' << i << ',' << task.metric.get()[i].to_score() << '\n';
+                  metrics_output << algorithm << ',' << threads << ',' << cluster_count << ',' << i << ',' << task.metric.get()[i].to_score() << '\n';
               }
               metrics_output << std::flush;
           }
@@ -139,7 +140,7 @@ struct experiment_configuration {
                 << "Average results:"
                 << " algorithm=" << algorithm
                 << " threads=" << threads
-                << (algorithm == "HogWild" ? "" : " cluster_size=" + std::to_string(cluster_size))
+                << (algorithm == "HogWild" ? "" : " cluster_count=" + std::to_string(cluster_count))
                 << " block_size=" << block_size
                 << " step_size=" << step_size
                 << " step_decay=" << step_decay
