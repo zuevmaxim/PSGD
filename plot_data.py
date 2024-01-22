@@ -27,6 +27,11 @@ def read_df(results_path):
     return df
 
 
+def plot_all(dataset, results_path):
+    plot_data(dataset, results_path)
+    plot__metrics_data(dataset, f"{results_path}.metric")
+
+
 def plot_data(dataset, results_path):
     df = read_df(results_path)
 
@@ -44,14 +49,14 @@ def plot__metrics_data(dataset, results_path):
 
     output_dir = os.path.dirname(results_path)
 
-    sns.lineplot(x="epoch", y="accuracy", data=df, hue="threads", errorbar=('ci', 95))
+    sns.lineplot(x="epoch", y="accuracy", data=df, hue=df[["algorithm", "threads", "cluster_count"]].apply(tuple, axis=1), errorbar=('ci', 95))
     plt.title(f"{dataset} Accuracy by epoch")
     plt.savefig(f"{output_dir}/{dataset}_accuracy.png", dpi=300)
     plt.close()
 
 
 if __name__ == "__main__":
-    path = "results/svm_230319-114521"
+    path = "results/svm_230319-145026"
     datasets = ["rcv1"]
     for d in datasets:
         # plot_data(d, f"{path}/{d}.csv")

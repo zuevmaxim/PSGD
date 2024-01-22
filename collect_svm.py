@@ -5,9 +5,9 @@ import sys
 import time
 from subprocess import check_call
 
-from plot_data import plot_data
+from plot_data import plot_all
 
-test_repeats = 10
+test_repeats = 20
 phy_cores = 16
 datasets = [
     # "a8a",
@@ -16,16 +16,16 @@ datasets = [
     # "music",
     "rcv1",
     # "epsilon",
-    # "news20",
-    # "url",
-    # "kdda",
+    "news20",
+    "url",
+    "kdda",
 ]
 stepdecay_trials_length = 1
-nthreads = [1, 2, 4, 8, 16]
+nthreads = [1, 2, 4, 8]
 algorithms = [
     "HogWild",
-    "HogWild++",
-    "MyWild"
+    # "HogWild++",
+    # "MyWild"
 ]
 max_iterations = {
     "HogWild": {"default": 150, "epsilon": 75, "kdda": 20},
@@ -169,4 +169,4 @@ if __name__ == "__main__":
         else:
             print("*** This is a dry run. No results will be produced. ***")
         print()
-        plot_data(d, output_file)
+        plot_all(d, output_file)
